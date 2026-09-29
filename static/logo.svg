@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <title>渐渐飞：向上飞的彗星</title>
+  <title>渐渐飞：由重到轻，向上飞的彗星</title>
   <rect width="64" height="64" rx="20" fill="#D96643"/>
-  <path d="M11 52C22 43 23 32 29 22C33 15 40 12 46 16C53 20 54 29 48 35C42 41 33 39 25 44C19 48 15 51 11 52Z" fill="#FFF7E8"/>
+  <path transform="rotate(180 32 32)" d="M11 52C22 43 23 32 29 22C33 15 40 12 46 16C53 20 54 29 48 35C42 41 33 39 25 44C19 48 15 51 11 52Z" fill="#FFF7E8"/>
 </svg>
