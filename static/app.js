@@ -4,7 +4,7 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const TODAY = new Date().toLocaleDateString('sv-SE');
 const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null, recordingIntent: '' };
-const pageMeta = { chat: ['私人减脂助手', '和 FitAI 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
+const pageMeta = { chat: ['私人减脂助手', '和 渐渐飞 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
 const undoRecords = [];
 
 function esc(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -149,7 +149,7 @@ function renderToday() {
   const t = S.state?.today; if (!t) return;
   const u = unit(); const has = !!t.has_meals; const intake = has ? energy(t.intake) : null; const target = energy(t.target_intake);
   $('#intakeUnit').textContent = u; $('#intakeValue').textContent = intake ?? '—'; $('#mealStatusBadge').textContent = statusText(t.meal_status);
-  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 FitAI 你吃了什么。';
+  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 渐渐飞 你吃了什么。';
   $('#energyCaption').textContent = has ? `今日目标约 ${target} ${u}` : '记录饮食后显示目标进度';
   $('#targetValue').textContent = `目标 ${target ?? '—'} ${u}`;
   const pct = has && t.target_intake ? Math.min(115, num(t.intake) / num(t.target_intake) * 100) : 0;
@@ -299,7 +299,7 @@ function searchSources(data) {
 }
 function renderMessages() {
   $('#welcome').hidden = S.messages.length > 0;
-  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${m.role}">${m.role === 'assistant' ? '<span class="message-avatar">F</span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
+  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${m.role}">${m.role === 'assistant' ? '<span class="message-avatar">↗</span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
   const streaming = S.messages.find(m => m.streaming);
   if (streaming) {
     const text = $('#messages .message:last-child .message-text');
@@ -527,7 +527,7 @@ async function testModel(){const el=$('#testModelStatus');el.textContent='正在
 async function testSearch(){const el=$('#testSearchStatus'),btn=$('#testSearchBtn');btn.disabled=true;el.textContent='正在连接 Tavily…';try{const r=await api.post('/api/test_search',{tavily_api_key:$('#tavilyKey').value.trim()});el.textContent=`${r.message} · ${r.result_count} 条来源`}catch(e){el.textContent=e.message}finally{btn.disabled=false}}
 async function toggleSearch(){const el=$('#searchToggle');if(S.busy){el.checked=!!S.state?.settings?.search_ready;return}if(el.checked&&!S.state?.settings?.has_tavily_key){el.checked=false;openSettings('search');toast('先填写 Tavily API Key');return}el.disabled=true;try{await api.post('/api/settings',{search_enabled:el.checked});await loadState();toast(el.checked?'联网搜索已开启':'联网搜索已关闭')}catch(e){el.checked=!!S.state?.settings?.search_ready;toast(e.message)}finally{el.disabled=false}}
 async function clearSearchKey(){if(!confirm('移除本机保存的 Tavily Key 并关闭联网搜索？'))return;try{await api.post('/api/settings',{tavily_api_key_action:'clear'});await loadState();$('#tavilyKey').value='';$('#tavilyKey').placeholder='tvly-…';$('#searchEnabled').checked=false;$('#testSearchStatus').textContent='Key 已移除，联网搜索已关闭'}catch(e){toast(e.message)}}
-async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`fitai-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
+async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`渐渐飞-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {

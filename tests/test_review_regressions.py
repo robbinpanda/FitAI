@@ -72,7 +72,7 @@ class LauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="fitai-launch-") as tmp:
             folder = Path(tmp) / "中文 space"
             folder.mkdir()
-            bat = folder / "启动 FitAI.bat"
+            bat = folder / "启动 渐渐飞.bat"
             bat.write_bytes(script)
             (folder / "server.py").write_text(
                 "import sys\nprint('LAUNCH_OK', sys.argv[1:])\nsys.exit(7)\n", encoding="utf-8")

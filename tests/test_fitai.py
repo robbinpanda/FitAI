@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""FitAI 回归检查：临时库 + mock，不调用真实模型、不用真实个人数据。"""
+"""渐渐飞 回归检查：临时库 + mock，不调用真实模型、不用真实个人数据。"""
 import json
 import os
 import sys
@@ -232,7 +232,7 @@ class HttpTests(unittest.TestCase):
     def test_health(self):
         h = self.get("/api/health")
         self.assertTrue(h["ok"])
-        self.assertEqual(h["app"], "FitAI")
+        self.assertEqual(h["app"], "渐渐飞")
 
     def test_coach_sessions_and_image_roundtrip(self):
         d = server.date.today().isoformat()

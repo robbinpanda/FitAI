@@ -1,6 +1,8 @@
-# FitAI 2.0 · 个人减脂 Agent
+# 渐渐飞 2.0 · 个人减脂 Agent
 
-本地运行的对话式减脂 Agent：用户只需要说出吃了什么、做了什么，FitAI 会把内容整理成结构化工具调用，在用户确认后记录饮食 / 运动 / 体重；不需要记录时，它就是一名基于真实近况回答的 AI 教练。
+当前为 `main` 分支，仅保留本地部署功能。账号、邀请注册、共享 API、展示主页和公网部署版本位于 `server` 分支。
+
+本地运行的对话式减脂 Agent：用户只需要说出吃了什么、做了什么，渐渐飞 会把内容整理成结构化工具调用，在用户确认后记录饮食 / 运动 / 体重；不需要记录时，它就是一名基于真实近况回答的 AI 教练。
 
 主界面现在只有三个入口：**AI 对话、今日概要、趋势**。原先分散的饮食识别、运动估算和教练能力已合并到对话中。详细协议、上下文选择与联网搜索方案见 [AGENT设计.md](./AGENT设计.md)。
 
@@ -57,13 +59,13 @@ AI 通过 JSON `search_web` 只读工具按需检索（每轮最多两次），�
 
 注意：搜索摘要不保证有完整营养表；模型须核对地区、份量、单位和数据来源，不能把第三方摘要说成官方精确值。
 
-双击 `启动 FitAI.bat`，浏览器会打开 `http://127.0.0.1:8765`。关闭命令行窗口即停止服务。
+双击 `启动 渐渐飞.bat`，浏览器会打开 `http://127.0.0.1:8765`。关闭命令行窗口即停止服务。
 
 脚本先检查当前用户的 Workbuddy、Miniconda/Anaconda 和常见 Python 安装目录，再尝试 `py -3` 和 PATH 中的 `python`（跳过 WindowsApps 商店占位程序）。要求 Python 3.10 或更新版本并支持 SQLite。
 
 Windows 启动脚本必须保存为 **UTF-8 无 BOM、CRLF 换行**；LF 换行可能让 `cmd.exe` 截断中文行附近的命令，出现 `ATH`、`erver.py` 等“不是命令”的错误。`.gitattributes` 已固定 `.bat` 使用 CRLF。启动后的实际地址以控制台输出为准，端口占用时可能顺延。
 
-需要不自动打开浏览器时，可以在 PowerShell 执行 `& '.\启动 FitAI.bat' --no-browser`。保留启动窗口即可继续使用；关闭窗口停止服务。
+需要不自动打开浏览器时，可以在 PowerShell 执行 `& '.\启动 渐渐飞.bat' --no-browser`。保留启动窗口即可继续使用；关闭窗口停止服务。
 
 手动启动：
 
@@ -99,7 +101,7 @@ python server.py --no-browser
 ├─ data/photos/            # 保存到本日饮食的餐食照片
 ├─ data/backups/           # 迁移 / 导入前的一致性备份
 ├─ tests/test_fitai.py     # 临时库回归（不调用真实模型）
-└─ 启动 FitAI.bat
+└─ 启动 渐渐飞.bat
 ```
 
 ---
@@ -134,7 +136,7 @@ python server.py --no-browser
 
 | 路径 | 参数 | 返回 |
 |---|---|---|
-| `/api/health` | — | `{ok, app: "FitAI", version, schema_version, energy_unit}`，供启动探测 |
+| `/api/health` | — | `{ok, app: "渐渐飞", version, schema_version, energy_unit}`，供启动探测 |
 | `/api/state` | `date` | 当天汇总 + settings + `session_token` + `display_unit` |
 | `/api/history` | `days`(7–180), `end` | 自然日数组。`end` 为截止日期（历史教练用） |
 | `/api/weights` | — | 最近 200 条体重 |
@@ -189,7 +191,7 @@ python server.py --no-browser
 
 非法日期、负数营养、NaN/Infinity、超长字符串、错误餐次、列表形状错误一律 400，数据库不变。未知内部错误返回通用 500 和 `log_id`，不回传堆栈。
 
-导入仅接受含 `app: "FitAI"`、整数版本、明确能量单位、完整档案及四组记录数组的备份。整个文件校验完成后才备份和恢复。无版本/无单位的旧 JSON 不会自动猜测和导入，以免清空记录或造成单位偏差；恢复不覆盖现有模型 Key。
+导入仅接受含 `app: "渐渐飞"`、整数版本、明确能量单位、完整档案及四组记录数组的备份。整个文件校验完成后才备份和恢复。无版本/无单位的旧 JSON 不会自动猜测和导入，以免清空记录或造成单位偏差；恢复不覆盖现有模型 Key。
 
 ---
 
