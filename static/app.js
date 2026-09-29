@@ -302,7 +302,7 @@ function searchSources(data) {
 }
 function renderMessages() {
   $('#welcome').hidden = S.messages.length > 0;
-  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar">↗</span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
+  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar"><img src="/logo.svg" alt="渐渐飞" width="29" height="29"></span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
   const streaming = S.messages.find(m => m.streaming);
   if (streaming) {
     const text = $('#messages .message:last-child .message-text');

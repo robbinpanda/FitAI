@@ -8,12 +8,12 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/auth.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='10' fill='%23e8664a'/><path d='M10 21V9h10M10 15h8' stroke='white' stroke-width='3' stroke-linecap='round' fill='none'/></svg>">
-</head>
+<link rel="icon" type="image/svg+xml" href="/logo.svg"><link rel="stylesheet" href="/brand.css"></head>
 <body>
   <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><div class="brand-mark">↗</div><div><strong>渐渐飞</strong><span>你的减脂 Agent</span></div></div>
+      <div class="brand"><div class="brand-mark"><img src="/logo.svg" alt="" width="40" height="40"></div><div><strong>渐渐飞</strong><span>你的减脂 Agent</span></div></div>
       <nav class="main-nav" aria-label="主导航">
         <button class="nav-item active" data-page="chat"><svg viewBox="0 0 24 24"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 12.5v-6Z"/></svg><span>AI 对话</span><kbd>1</kbd></button>
         <button class="nav-item" data-page="today"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM8 3v4M16 3v4M5 9h14"/></svg><span>今日概要</span><kbd>2</kbd></button>
@@ -41,7 +41,7 @@
       <section class="page page-chat active" id="page-chat">
         <div class="chat-stage">
           <div class="message-scroll" id="messageScroll">
-            <div class="welcome" id="welcome"><div class="agent-orb"><span>↗</span><i></i></div><p class="welcome-kicker" id="welcomeKicker">今天也一起稳稳地来</p><h2 id="welcomeTitle">吃了什么、做了什么，<br>直接告诉我就好。</h2><p>我会理解你的描述，整理成记录，先让你确认再保存。也可以随时问我怎么吃、怎么练。</p>
+            <div class="welcome" id="welcome"><div class="agent-orb"><img class="brand-icon" src="/logo.svg" alt="渐渐飞" width="64" height="64"></div><p class="welcome-kicker" id="welcomeKicker">今天也一起稳稳地来</p><h2 id="welcomeTitle">吃了什么、做了什么，<br>直接告诉我就好。</h2><p>我会理解你的描述，整理成记录，先让你确认再保存。也可以随时问我怎么吃、怎么练。</p>
               <div class="prompt-grid">
                 <button class="prompt-card" data-record-intent="meal"><span class="prompt-icon warm">食</span><span><b>记录饮食</b><small>输入吃了什么，或上传照片</small></span><i>↗</i></button>
                 <button class="prompt-card" data-record-intent="exercise"><span class="prompt-icon lilac">动</span><span><b>记录运动</b><small>输入运动项目、时长和强度</small></span><i>↗</i></button>
