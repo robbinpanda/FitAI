@@ -22,3 +22,20 @@ fetch('/api/auth/status', {cache:'no-store'}).then(response => response.ok ? res
   const register = document.getElementById('registerLink'); register.textContent = '进入应用 ↗'; register.href = '/index.html';
   document.querySelectorAll('[data-start]').forEach(link => { link.href = '/index.html'; });
 }).catch(() => {});
+
+// Interactive product preview: no upload, API request or personal record is created.
+const demoRice = document.getElementById('demoRice');
+const demoConfirm = document.getElementById('confirmFoodDemo');
+demoRice.addEventListener('change', () => {
+  const ratio = Number(demoRice.value) / 150;
+  document.getElementById('riceEnergy').textContent = Math.round(201 * ratio) + ' kcal';
+  document.getElementById('foodTotal').textContent = Math.round(319 + 201 * ratio) + ' kcal';
+  const fmt = n => Number(n.toFixed(1));
+  document.getElementById('foodMacros').textContent = `蛋白质 ${fmt(34 + 4 * ratio)} g · 碳水 ${fmt(12 + 44 * ratio)} g · 脂肪 ${fmt(15 + ratio)} g`;
+  document.getElementById('foodDemoStatus').textContent = '已更新估算，确认后再记录。';
+  demoConfirm.textContent = '确认示例'; demoConfirm.disabled = false;
+});
+demoConfirm.addEventListener('click', () => {
+  document.getElementById('foodDemoStatus').textContent = '演示完成。登录后即可保存自己的餐食记录。';
+  demoConfirm.textContent = '已确认 ✓'; demoConfirm.disabled = true;
+});

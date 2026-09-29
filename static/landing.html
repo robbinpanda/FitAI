@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="渐渐飞：拍照估算营养，记录饮食、运动和体重。">
-<title>渐渐飞，减减肥。</title>
+<title>减减肥，渐渐飞。</title>
 <link rel="stylesheet" href="/landing.css"><link rel="icon" type="image/svg+xml" href="/logo.svg"><link rel="stylesheet" href="/brand.css">
 </head>
 <body>
 <a class="skip" href="#main">跳到主要内容</a>
 <header class="header wrap">
 <a class="logo" href="/" aria-label="渐渐飞首页"><span class="logo-mark"><img src="/logo.svg" alt="" width="40" height="40"></span><b>渐渐飞</b></a>
-<nav class="nav" aria-label="主导航"><a href="#records">日常记录</a><a href="#trend">体重趋势</a></nav>
+<nav class="nav" aria-label="主导航"><a href="#photo-demo">拍照记录</a><a href="#records">日常记录</a><a href="#trend">体重趋势</a></nav>
 <div class="account"><a id="loginLink" href="/auth.html">登录</a><a class="button small" id="registerLink" href="/auth.html?mode=register">注册</a></div>
 </header>
 <main id="main">
 <section class="hero wrap">
-<div class="hero-copy"><h1>渐渐飞，<br><span>减减肥。</span></h1><p>拍照估算营养，<br>随手记录饮食、运动和体重。</p><a class="button" href="/auth.html?mode=register" data-start>开始记录 <span aria-hidden="true">↗</span></a></div>
+<div class="hero-copy"><h1>减减肥，<br><span>渐渐飞。</span></h1><p>拍照估算营养，<br>随手记录饮食、运动和体重。</p><a class="button" href="/auth.html?mode=register" data-start>开始记录 <span aria-hidden="true">↗</span></a></div>
 <div class="hero-visual" aria-label="拍照估算营养示例">
 <div class="meal-scene"><span class="scene-tag">午餐示例</span><svg class="food-art" viewBox="0 0 500 400" role="img" aria-label="鸡胸肉、蔬菜和米饭的插画"><defs><radialGradient id="plate"><stop stop-color="#fffef9"/><stop offset=".8" stop-color="#faf7ec"/><stop offset="1" stop-color="#d8d7c7"/></radialGradient><linearGradient id="chicken" x2="1" y2="1"><stop stop-color="#e9af68"/><stop offset="1" stop-color="#bf713d"/></linearGradient><filter id="shadow"><feDropShadow dx="0" dy="14" stdDeviation="10" flood-color="#43482b" flood-opacity=".15"/></filter><pattern id="rice" width="16" height="13" patternUnits="userSpaceOnUse"><rect width="16" height="13" fill="#e5dbc2"/><ellipse cx="7" cy="6" rx="6" ry="3" fill="#fff7e4" transform="rotate(-30 7 6)"/></pattern></defs><ellipse cx="250" cy="204" rx="177" ry="160" fill="url(#plate)" filter="url(#shadow)"/><ellipse cx="250" cy="204" rx="148" ry="131" fill="#ecebdd"/><path d="M265 92C344 69 413 140 369 231C328 247 265 239 237 199Z" fill="url(#rice)"/><g fill="#6e8a40" stroke="#506c2d" stroke-width="2"><path d="M126 134Q169 80 210 127Q223 155 198 180Q142 188 126 134Z"/><path d="M103 183Q131 146 169 174Q192 201 168 233Q110 251 103 183Z"/><path d="M169 124Q211 103 238 135Q244 174 208 183Z"/><path d="M124 239Q162 211 200 241Q211 283 174 297Q119 287 124 239Z"/></g><g fill="#91a55a"><circle cx="144" cy="128" r="19"/><circle cx="170" cy="117" r="19"/><circle cx="188" cy="136" r="21"/><circle cx="131" cy="190" r="21"/><circle cx="157" cy="205" r="23"/><circle cx="157" cy="253" r="23"/></g><g transform="rotate(-28 250 246)" fill="url(#chicken)" stroke="#f2ce91" stroke-width="4"><rect x="181" y="186" width="132" height="27" rx="13"/><rect x="173" y="217" width="149" height="29" rx="13"/><rect x="177" y="250" width="145" height="29" rx="13"/><rect x="190" y="283" width="117" height="25" rx="12"/></g><g fill="#c95635" stroke="#f19064" stroke-width="4"><circle cx="327" cy="292" r="23"/><circle cx="358" cy="268" r="21"/></g><g fill="#efd797"><circle cx="321" cy="286" r="3"/><circle cx="334" cy="297" r="3"/><circle cx="352" cy="261" r="3"/><circle cx="362" cy="272" r="3"/></g><g fill="#556636"><circle cx="223" cy="230" r="2"/><circle cx="247" cy="252" r="2"/><circle cx="268" cy="218" r="2"/><circle cx="283" cy="264" r="2"/></g></svg></div>
 <div class="nutrition-result"><h2>鸡胸肉时蔬饭</h2><div class="nutrients">
@@ -25,6 +25,16 @@
 <div><strong>16<small> g</small></strong><span>脂肪</span></div>
 </div></div>
 </div>
+</section>
+<section class="photo-section wrap" id="photo-demo">
+<div class="demo-heading"><div><h2>一张照片，记清这一餐。</h2><p>AI 列出食物和营养估算，你调整份量，确认保存。</p></div><a class="photo-try" href="/auth.html?mode=register" data-start>用我的照片试试 ↗</a></div>
+<div class="photo-workflow">
+<div class="photo-input"><span class="step-label">1 / 上传照片</span><div class="uploaded-image"><img src="/meal-demo.svg" alt="上传餐食示意：鸡胸肉、米饭和蔬菜" width="500" height="400"><span>餐食图片示意</span></div><p class="photo-message">帮我记下这顿午餐。</p></div>
+<div class="food-output"><span class="step-label">2 / AI 整理食物清单</span><div class="assistant-heading"><img src="/logo.svg" alt="" width="32" height="32"><b>这餐有这些食物</b><span>估算示例</span></div>
+<table class="food-list"><thead><tr><th scope="col">食物</th><th scope="col">份量</th><th scope="col">热量</th></tr></thead><tbody><tr><th scope="row">鸡胸肉</th><td>100 g</td><td>156 kcal</td></tr><tr><th scope="row">米饭</th><td><select id="demoRice" aria-label="调整示例米饭份量"><option value="100">100 g</option><option value="150" selected>150 g</option><option value="200">200 g</option></select></td><td id="riceEnergy">201 kcal</td></tr><tr><th scope="row">时蔬</th><td>150 g</td><td>82 kcal</td></tr><tr><th scope="row">烹饪用油</th><td>9 g</td><td>81 kcal</td></tr></tbody></table>
+<div class="demo-total" aria-live="polite"><div><span>本餐合计</span><strong id="foodTotal">520 <small>kcal</small></strong></div><p id="foodMacros">蛋白质 38 g · 碳水 56 g · 脂肪 16 g</p></div>
+<div class="demo-save"><div><span class="step-label">3 / 调整后确认</span><p id="foodDemoStatus" role="status">试着调整米饭份量，看看营养变化。</p></div><button class="button" id="confirmFoodDemo" type="button">确认示例</button></div>
+</div></div>
 </section>
 <section class="record-section wrap" id="records">
 <div class="section-copy"><h2>说一句，就记下。</h2><p>饮食、运动都能记。<br>确认后保存，随时可修改。</p></div>
