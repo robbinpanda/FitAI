@@ -24,14 +24,14 @@ fetch('/api/auth/status', {cache:'no-store'}).then(response => response.ok ? res
 }).catch(() => {});
 
 // Interactive product preview: no upload, API request or personal record is created.
-const demoRice = document.getElementById('demoRice');
+const demoPasta = document.getElementById('demoPasta');
 const demoConfirm = document.getElementById('confirmFoodDemo');
-demoRice.addEventListener('change', () => {
-  const ratio = Number(demoRice.value) / 150;
-  document.getElementById('riceEnergy').textContent = Math.round(201 * ratio) + ' kcal';
-  document.getElementById('foodTotal').textContent = Math.round(319 + 201 * ratio) + ' kcal';
+demoPasta.addEventListener('change', () => {
+  const ratio = Number(demoPasta.value) / 150;
+  document.getElementById('pastaEnergy').textContent = Math.round(221 * ratio) + ' kcal';
+  document.getElementById('foodTotal').textContent = Math.round(315 + 221 * ratio) + ' kcal';
   const fmt = n => Number(n.toFixed(1));
-  document.getElementById('foodMacros').textContent = `蛋白质 ${fmt(34 + 4 * ratio)} g · 碳水 ${fmt(12 + 44 * ratio)} g · 脂肪 ${fmt(15 + ratio)} g`;
+  document.getElementById('foodMacros').textContent = `蛋白质 ${fmt(29 + 8 * ratio)} g · 碳水 ${fmt(7 + 45 * ratio)} g · 脂肪 ${fmt(19 + ratio)} g`;
   document.getElementById('foodDemoStatus').textContent = '已更新估算，确认后再记录。';
   demoConfirm.textContent = '确认示例'; demoConfirm.disabled = false;
 });
