@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · 渐渐飞</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/auth.css"></head>
+<body class="auth-page"><main class="auth-card"><a class="auth-back" href="/">← 返回渐渐飞首页</a>
+  <div class="brand"><div class="brand-mark">↗</div><div><strong>渐渐飞</strong><span>你的减脂 Agent</span></div></div>
+  <p id="modeHint">正在连接…</p><h1 id="authTitle">欢迎回来</h1>
+  <p>登录后，继续你的饮食、运动与体重记录。</p>
+  <form id="authForm">
+    <label for="username">用户名</label><input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}" required placeholder="3–32 位字母、数字、下划线或短横线">
+    <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required placeholder="至少 12 个字符">
+    <div id="confirmField" hidden><label for="confirmPassword">确认密码</label><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128"></div>
+    <div id="inviteField" hidden><label for="invite">邀请码</label><input id="invite" type="password" autocomplete="off" maxlength="128" placeholder="向管理员获取邀请码"></div>
+    <p id="authError" role="alert"></p><button class="primary-button" id="submitAuth" type="submit" disabled>登录</button>
+  </form>
+  <button class="text-button" id="toggleAuth" disabled>没有账号？注册</button>
+  <p class="auth-help" id="registrationHint"></p>
+  <p class="auth-help">忘记密码请联系部署管理员。账号不会在本地版和服务器版之间自动同步。</p>
+</main><script src="/auth.js"></script></body></html>

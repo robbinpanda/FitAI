@@ -41,7 +41,7 @@ if not defined PY (
 )
 
 echo.
-echo   FitAI is starting...
+echo   JianJianFei is starting...
 echo   Python: %PY%
 echo   The actual server address will be printed below.
 echo   Close this window to stop the server.

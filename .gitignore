@@ -18,3 +18,9 @@ node_modules/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Deployment credentials, exports and release archives
+*.pem
+*.key
+*.tar.gz
+/legacy-export.json

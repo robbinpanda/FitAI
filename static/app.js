@@ -4,7 +4,7 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const TODAY = new Date().toLocaleDateString('sv-SE');
 const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null, recordingIntent: '' };
-const pageMeta = { chat: ['私人减脂助手', '和 FitAI 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
+const pageMeta = { chat: ['私人减脂助手', '和 渐渐飞 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
 const undoRecords = [];
 
 function esc(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -21,12 +21,14 @@ const api = {
   async get(path) {
     const res = await fetch(path, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
     if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
     return data;
   },
   async post(path, body) {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-FitAI-Token': S.token }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
     if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
     return data;
   }
@@ -51,6 +53,7 @@ function scheduleChatPaint() {
 async function streamAgent(body, onEvent, signal) {
   const response = await fetch('/api/agent', {method:'POST', signal,
     headers:{'Content-Type':'application/json','X-FitAI-Token':S.token}, body:JSON.stringify({...body,stream:true})});
+  if (response.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
@@ -149,7 +152,7 @@ function renderToday() {
   const t = S.state?.today; if (!t) return;
   const u = unit(); const has = !!t.has_meals; const intake = has ? energy(t.intake) : null; const target = energy(t.target_intake);
   $('#intakeUnit').textContent = u; $('#intakeValue').textContent = intake ?? '—'; $('#mealStatusBadge').textContent = statusText(t.meal_status);
-  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 FitAI 你吃了什么。';
+  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 渐渐飞 你吃了什么。';
   $('#energyCaption').textContent = has ? `今日目标约 ${target} ${u}` : '记录饮食后显示目标进度';
   $('#targetValue').textContent = `目标 ${target ?? '—'} ${u}`;
   const pct = has && t.target_intake ? Math.min(115, num(t.intake) / num(t.target_intake) * 100) : 0;
@@ -263,7 +266,7 @@ async function loadSessions(selectLatest = false) {
   if (!S.sessionId || selectLatest || !S.sessions.some(x => x.id === S.sessionId)) S.sessionId = S.sessions[0].id;
   renderSessions(); await loadMessages();
 }
-function renderSessions() { $('#sessionList').innerHTML = S.sessions.slice(0,8).map(s => `<button class="${s.id === S.sessionId ? 'active' : ''}" data-session="${s.id}" title="${esc(s.title)}">${esc(s.title || '新对话')}</button>`).join(''); }
+function renderSessions() { $('#sessionList').innerHTML = S.sessions.slice(0,8).map(s => `<button class="${s.id === S.sessionId ? 'active' : ''}" data-session="${esc(s.id)}" title="${esc(s.title)}">${esc(s.title || '新对话')}</button>`).join(''); }
 async function createSession() { if(S.busy){toast('请先停止生成，再新建对话');return;} selectRecordingIntent(''); try { const data = await api.post('/api/coach/session/create', { date: S.date, title: '新对话' }); S.sessionId = data.session.id; await loadSessions(); goPage('chat'); $('#chatInput').focus(); } catch (e) { toast(e.message); } }
 async function loadMessages() { if (!S.sessionId) return; try { const data = await api.get(`/api/coach/session?id=${encodeURIComponent(S.sessionId)}`); S.messages = data.messages || []; renderMessages(); } catch (e) { toast(e.message); } }
 
@@ -289,8 +292,8 @@ function toolSummary(call) {
 function toolName(name) { return ({ log_meal:'记录饮食', log_exercise:'记录运动', log_weight:'记录体重', update_meal:'修改饮食',update_exercise:'修改运动',update_weight:'修改体重',delete_meal:'删除饮食',delete_exercise:'删除运动',delete_weight:'删除体重',restore_record:'恢复记录',manage_records:'批量管理记录' })[name] || name; }
 function toolCard(call, messageId) {
   if (call.name === 'mark_day_complete') return '<div class="tool-card"><div class="tool-lines">旧版完成标记已停用；已有记录自动汇总，无需操作。</div></div>';
-  const status = call.status || 'pending'; const statusName = ({pending:'待确认',confirmed:isManagementCall(call)?'已完成':'已记录',rejected:'已取消'})[status] || status;
-  return `<div class="tool-card"><div class="tool-card-head"><span class="tool-symbol">${call.name === 'log_exercise' ? '动' : call.name === 'log_weight' ? '重' : '记'}</span><div><b>${toolName(call.name)}</b><small>${esc(call.arguments?.date || S.date)}</small></div><span class="tool-state ${status}">${statusName}</span></div><div class="tool-lines">${toolSummary(call).map(x => `<div class="tool-line"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${status === 'pending' ? `<div class="tool-card-actions"><button class="confirm" data-tool-open="${esc(call.id)}" data-message="${messageId}">查看并确认</button><button class="reject" data-tool-reject="${esc(call.id)}" data-message="${messageId}">不记录</button></div>` : ''}</div>`;
+  const status = ['pending','confirmed','rejected'].includes(call.status) ? call.status : 'pending'; const statusName = ({pending:'待确认',confirmed:isManagementCall(call)?'已完成':'已记录',rejected:'已取消'})[status] || status;
+  return `<div class="tool-card"><div class="tool-card-head"><span class="tool-symbol">${call.name === 'log_exercise' ? '动' : call.name === 'log_weight' ? '重' : '记'}</span><div><b>${esc(toolName(call.name))}</b><small>${esc(call.arguments?.date || S.date)}</small></div><span class="tool-state ${status}">${statusName}</span></div><div class="tool-lines">${toolSummary(call).map(x => `<div class="tool-line"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${status === 'pending' ? `<div class="tool-card-actions"><button class="confirm" data-tool-open="${esc(call.id)}" data-message="${messageId}">查看并确认</button><button class="reject" data-tool-reject="${esc(call.id)}" data-message="${messageId}">不记录</button></div>` : ''}</div>`;
 }
 function searchSources(data) {
   if (!data) return '';
@@ -299,7 +302,7 @@ function searchSources(data) {
 }
 function renderMessages() {
   $('#welcome').hidden = S.messages.length > 0;
-  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${m.role}">${m.role === 'assistant' ? '<span class="message-avatar">F</span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
+  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar">↗</span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
   const streaming = S.messages.find(m => m.streaming);
   if (streaming) {
     const text = $('#messages .message:last-child .message-text');
@@ -513,8 +516,8 @@ function renderImages() { const box=$('#imageStrip'); box.hidden=!S.images.lengt
 function openSettings(tab = 'profile') {
   const s=S.state?.settings||{}, p=S.state?.today?.profile||{};
   $('#profileGender').value=p.gender||'male'; $('#profileAge').value=p.age||''; $('#profileHeight').value=p.height||''; $('#profileStart').value=p.start_weight||S.state?.today?.weight||''; $('#profileTarget').value=p.target_weight||''; $('#profileWeekly').value=String(p.weekly_loss ?? .5); $('#profileActivity').value=String(p.activity||1.2);
-  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent='';
-  $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
+  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.key_source==='shared'?'正在使用站点默认 API；填写可改用自己的':s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent='';
+  $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.tavily_key_source==='shared'?'正在使用站点默认搜索 API':s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
   selectSettingsTab(tab); openMask('settingsMask');
 }
 function selectSettingsTab(tab) { $$('.settings-tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab)); $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab)); }
@@ -526,8 +529,13 @@ async function saveSettings() {
 async function testModel(){const el=$('#testModelStatus');el.textContent='正在测试…';try{const key=$('#modelKey').value.trim();const r=await api.post('/api/test_key',{base_url:$('#modelBase').value.trim(),model:$('#modelName').value.trim(),api_key:key});el.textContent=`连接成功 · ${r.model}`}catch(e){el.textContent=e.message}}
 async function testSearch(){const el=$('#testSearchStatus'),btn=$('#testSearchBtn');btn.disabled=true;el.textContent='正在连接 Tavily…';try{const r=await api.post('/api/test_search',{tavily_api_key:$('#tavilyKey').value.trim()});el.textContent=`${r.message} · ${r.result_count} 条来源`}catch(e){el.textContent=e.message}finally{btn.disabled=false}}
 async function toggleSearch(){const el=$('#searchToggle');if(S.busy){el.checked=!!S.state?.settings?.search_ready;return}if(el.checked&&!S.state?.settings?.has_tavily_key){el.checked=false;openSettings('search');toast('先填写 Tavily API Key');return}el.disabled=true;try{await api.post('/api/settings',{search_enabled:el.checked});await loadState();toast(el.checked?'联网搜索已开启':'联网搜索已关闭')}catch(e){el.checked=!!S.state?.settings?.search_ready;toast(e.message)}finally{el.disabled=false}}
-async function clearSearchKey(){if(!confirm('移除本机保存的 Tavily Key 并关闭联网搜索？'))return;try{await api.post('/api/settings',{tavily_api_key_action:'clear'});await loadState();$('#tavilyKey').value='';$('#tavilyKey').placeholder='tvly-…';$('#searchEnabled').checked=false;$('#testSearchStatus').textContent='Key 已移除，联网搜索已关闭'}catch(e){toast(e.message)}}
-async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`fitai-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
+async function clearOwnKey(kind){
+  const search=kind==='search', action=search?'tavily_api_key_action':'api_key_action';
+  try{await api.post('/api/settings',{[action]:'clear'});await loadState();openSettings(search?'search':'model');toast((search?S.state.settings.has_tavily_key:S.state.settings.has_key)?'个人 Key 已删除，已恢复站点默认 API':'个人 Key 已删除，当前没有站点默认 API')}catch(e){toast(e.message)}
+}
+async function clearSearchKey(){return clearOwnKey('search')}
+
+async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`渐渐飞-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
@@ -558,7 +566,7 @@ function bind() {
   document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt],[data-record-intent],[data-chat-entry]');if(p)handleChatShortcut(p); const s=e.target.closest('[data-session]');if(s){if(S.busy){toast('请先停止生成，再切换对话');return;}followChat=true;selectRecordingIntent('');S.sessionId=s.dataset.session;renderSessions();loadMessages();goPage('chat')} const rem=e.target.closest('[data-remove-image]');if(rem){S.images.splice(Number(rem.dataset.removeImage),1);renderImages()} const open=e.target.closest('[data-tool-open]');if(open)openTool(open.dataset.message,open.dataset.toolOpen);const rej=e.target.closest('[data-tool-reject]');if(rej){const m=S.messages.find(x=>x.id===Number(rej.dataset.message));const c=m?.tool_calls?.find(x=>x.id===rej.dataset.toolReject);if(c)decideTool('reject',{messageId:Number(rej.dataset.message),call:c})} const close=e.target.closest('[data-close]');if(close)closeMask(close.dataset.close)});
   $('#confirmToolBtn').onclick=()=>decideTool('confirm'); $('#rejectToolBtn').onclick=()=>decideTool('reject');
   $$('.modal-mask').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)closeMask(m.id)})); document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal-mask:not([hidden])').forEach(m=>closeMask(m.id));if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!e.ctrlKey&&!e.metaKey&&['1','2','3'].includes(e.key))goPage(['chat','today','trend'][Number(e.key)-1])});
-  $$('.settings-tabs button').forEach(x=>x.onclick=()=>selectSettingsTab(x.dataset.tab)); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
+  $$('.settings-tabs button').forEach(x=>x.onclick=()=>selectSettingsTab(x.dataset.tab)); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#clearModelKeyBtn').onclick=()=>clearOwnKey('model'); $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
   $('#testSearchBtn').onclick=testSearch; $('#clearSearchKeyBtn').onclick=clearSearchKey; $('#searchToggle').onchange=toggleSearch;
   $('#todayLogs').addEventListener('click',e=>{const btn=e.target.closest('[data-edit-id]');if(btn)openRecord(btn.dataset.editKind,btn.dataset.editId)});
   $('#toolEditor').addEventListener('input',handleEditorInput);
@@ -567,5 +575,36 @@ function bind() {
   $$('#rangeSwitch button').forEach(x=>x.onclick=()=>{S.range=Number(x.dataset.range);$$('#rangeSwitch button').forEach(b=>b.classList.toggle('active',b===x));renderTrend()});
 }
 
-async function init(){bind();updateDateHeader();await loadState();await loadSessions();if(S.state?.needs_setup)openSettings('profile');}
+async function init(){
+  try {
+    const auth = await api.get('/api/auth/status');
+    if (!auth.user) { location.replace('/auth.html'); return; }
+    S.token = auth.session_token;
+    const account = $('#accountBtn');
+    account.textContent = auth.user.username + ' · 切换';
+    account.addEventListener('click', () => openMask('accountMask'));
+    $('#logoutConfirm').addEventListener('click', async () => {
+      try {
+        if (streamController) streamController.abort();
+        await api.post('/api/auth/logout', {});
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('fitai-account'); channel.postMessage('changed'); channel.close();
+        }
+        location.replace('/auth.html');
+      } catch(e) { toast(e.message); }
+    });
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('fitai-account');
+      channel.onmessage = () => location.reload();
+    }
+    window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+    window.addEventListener('focus', async () => {
+      try { const current = await api.get('/api/auth/status');
+        if (current.session_token !== S.token) location.reload();
+      } catch(e) { toast(e.message); }
+    });
+    bind();updateDateHeader();await loadState();await loadSessions();
+    if(S.state?.needs_setup)openSettings('profile');
+  } catch(e) { toast(e.message); }
+}
 init();
