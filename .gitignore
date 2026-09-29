@@ -1,0 +1,20 @@
+# Local records, photos, backups, and API credentials
+/data/
+.env
+.env.*
+!.env.example
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local assistant state and dependencies
+/.workbuddy/
+node_modules/
+
+# Operating system files
+.DS_Store
+Thumbs.db

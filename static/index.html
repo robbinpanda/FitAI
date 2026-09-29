@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f4ef">
+  <title>FitAI · 你的减脂 Agent</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='10' fill='%23e8664a'/><path d='M10 21V9h10M10 15h8' stroke='white' stroke-width='3' stroke-linecap='round' fill='none'/></svg>">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark">F</div><div><strong>FitAI</strong><span>你的减脂 Agent</span></div></div>
+      <nav class="main-nav" aria-label="主导航">
+        <button class="nav-item active" data-page="chat"><svg viewBox="0 0 24 24"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 12.5v-6Z"/></svg><span>AI 对话</span><kbd>1</kbd></button>
+        <button class="nav-item" data-page="today"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM8 3v4M16 3v4M5 9h14"/></svg><span>今日概要</span><kbd>2</kbd></button>
+        <button class="nav-item" data-page="trend"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l4-5 3 3 5-7"/></svg><span>趋势</span><kbd>3</kbd></button>
+      </nav>
+      <div class="session-block">
+        <div class="session-heading"><span>最近对话</span><button id="newChatBtn" title="新对话">＋</button></div>
+        <div id="sessionList" class="session-list"></div>
+      </div>
+      <div class="sidebar-foot"><button class="profile-chip" id="settingsBtn"><span class="profile-avatar">我</span><span><b id="profileTitle">个人档案</b><small id="profileSub">完善目标与模型</small></span><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menuBtn" aria-label="打开菜单"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="page-identity"><span class="eyebrow" id="pageEyebrow">私人减脂助手</span><h1 id="pageTitle">和 FitAI 聊聊</h1></div>
+        <div class="top-actions">
+          <div class="date-control"><button id="prevDate" aria-label="前一天">‹</button><button id="dateButton"><span id="dateLabel">今天</span><small id="weekLabel">—</small></button><button id="nextDate" aria-label="后一天">›</button><input type="date" id="dateInput" tabindex="-1" aria-hidden="true"></div>
+          <button class="unit-button" id="unitBtn"><span id="unitLabel">kcal</span><small>切换单位</small></button>
+          <button class="icon-button settings-top" id="settingsTopBtn" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20.3h-3v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7 15a1.7 1.7 0 0 0-1.56-1.03H5.3v-3h.14A1.7 1.7 0 0 0 7 9.94a1.7 1.7 0 0 0-.34-1.88L6.6 8l2.12-2.12.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 11.7 4.7V4.6h3v.1a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 8l-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.14v3h-.14A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
+        </div>
+      </header>
+
+      <section class="page page-chat active" id="page-chat">
+        <div class="chat-stage">
+          <div class="message-scroll" id="messageScroll">
+            <div class="welcome" id="welcome"><div class="agent-orb"><span>F</span><i></i></div><p class="welcome-kicker" id="welcomeKicker">今天也一起稳稳地来</p><h2 id="welcomeTitle">吃了什么、做了什么，<br>直接告诉我就好。</h2><p>我会理解你的描述，整理成记录，先让你确认再保存。也可以随时问我怎么吃、怎么练。</p>
+              <div class="prompt-grid">
+                <button class="prompt-card" data-record-intent="meal"><span class="prompt-icon warm">食</span><span><b>记录饮食</b><small>输入吃了什么，或上传照片</small></span><i>↗</i></button>
+                <button class="prompt-card" data-record-intent="exercise"><span class="prompt-icon lilac">动</span><span><b>记录运动</b><small>输入运动项目、时长和强度</small></span><i>↗</i></button>
+                <button class="prompt-card" data-chat-entry="coach"><span class="prompt-icon sand">问</span><span><b>问问教练</b><small>基于近况给具体建议</small></span><i>↗</i></button>
+              </div>
+            </div>
+            <div class="messages" id="messages" aria-label="对话消息"></div>
+            <div class="typing" id="typing" role="status" aria-live="polite" hidden><span></span><span></span><span></span><em>FitAI 正在整理</em></div>
+          </div>
+          <div class="composer-wrap"><button id="jumpLatest" class="jump-latest" hidden>回到最新 ↓</button><div id="setupHint" class="setup-hint" hidden><span>连接 AI，即可开始记录与咨询</span><button id="setupModelBtn">配置模型 →</button></div><div id="chatError" class="chat-error" role="alert" hidden><span id="chatErrorText"></span><button id="retryBtn">重试</button><button id="dismissErrorBtn" aria-label="关闭提示">×</button></div><div class="composer-shortcuts"><button data-record-intent="meal">＋ 饮食</button><button data-record-intent="exercise">＋ 运动</button><button data-record-intent="weight">＋ 体重</button><span>描述 → 核对份量 → 确认保存</span></div><div id="recordingIntent" class="recording-intent" role="status" hidden><span id="recordingIntentText"></span><button id="cancelRecordingIntent" aria-label="退出记录模式">退出 ×</button></div><div class="image-strip" id="imageStrip" hidden></div><div class="composer" id="composer"><input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden><button class="composer-tool" id="imageBtn" aria-label="添加图片"><svg viewBox="0 0 24 24"><path d="M4 6h4l1.5-2h5L16 6h4v13H4z"/><circle cx="12" cy="12.5" r="3.5"/></svg></button><textarea id="chatInput" rows="1" aria-label="输入消息" maxlength="3000" placeholder="告诉我你吃了什么、做了什么，或问任何减脂问题…"></textarea><button class="stop-button" id="stopBtn" aria-label="停止生成" title="停止生成" hidden>■</button><button class="send-button" id="sendBtn" aria-label="发送"><svg viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v12"/></svg></button></div><div class="composer-meta"><span><i class="status-dot" id="aiDot"></i><b id="aiStatus">检查模型中</b></span><label class="search-toggle"><input type="checkbox" id="searchToggle"><span>联网搜索</span></label><span>Enter 发送 · Shift + Enter 换行</span></div></div>
+        </div>
+      </section>
+
+      <section class="page page-today" id="page-today"><div class="content-width">
+        <div class="section-intro"><div><span class="eyebrow">TODAY</span><h2>今天，保持在自己的节奏里</h2><p id="todayStatus">还没有饮食记录，告诉 FitAI 你吃了什么。</p></div><button class="soft-button ask-agent" data-prompt="帮我总结一下今天的状态">让 Agent 总结</button></div>
+        <div class="energy-layout"><article class="energy-card panel"><div class="panel-head"><span>今日已记录摄入</span><span class="data-badge" id="mealStatusBadge">未记录</span></div><div class="energy-main"><strong id="intakeValue">—</strong><span id="intakeUnit">kcal</span></div><p id="energyCaption">记录饮食后显示进度</p><div class="energy-track"><i id="energyProgress"></i><b id="energyTargetMark"></b></div><div class="energy-labels"><span>已摄入</span><span id="targetValue">目标 —</span></div></article>
+          <div class="mini-grid"><article class="mini-card panel"><span>剩余额度</span><strong id="remainingValue">—</strong><small id="remainingSub">等待记录</small></article><article class="mini-card panel"><span>运动消耗</span><strong id="exerciseValue">—</strong><small id="exerciseSub">今天还没有运动</small></article><article class="mini-card panel"><span>最近体重</span><strong id="weightValue">—</strong><small id="weightSub">还没有称重</small></article><article class="mini-card panel"><span>已记录能量差额</span><strong id="predictionValue">—</strong><small id="predictionSub">已录入摄入与估计消耗比较</small></article></div></div>
+        <div class="summary-grid"><article class="panel macro-panel"><div class="panel-head"><span>营养构成</span><small>克 / 今日</small></div><div id="macroRows"></div></article><article class="panel log-panel"><div class="panel-head"><span>今天的记录</span><button class="text-button ask-agent" data-chat-entry="record">去对话补充</button></div><div id="todayLogs" class="today-logs"></div><div id="undoRecords" class="undo-records" role="status" hidden></div></article></div>
+      </div></section>
+
+      <section class="page page-trend" id="page-trend"><div class="content-width"><div class="section-intro"><div><span class="eyebrow">PROGRESS</span><h2>趋势比某一天更重要</h2><p>用连续记录看方向，不被单日波动牵着走。</p></div><div class="range-switch" id="rangeSwitch"><button data-range="7">7 天</button><button class="active" data-range="14">14 天</button><button data-range="30">30 天</button></div></div><div class="trend-kpis" id="trendKpis"></div><div class="chart-grid"><article class="panel chart-card"><div class="panel-head"><span>体重趋势</span><small>kg</small></div><div class="chart" id="weightChart"></div></article><article class="panel chart-card"><div class="panel-head"><span>已记录能量摄入</span><small id="chartUnit">kcal</small></div><div class="chart" id="intakeChart"></div></article></div><article class="panel consistency-card"><div class="panel-head"><span>记录连续性</span><small>越持续，建议越准确</small></div><div class="day-dots" id="dayDots"></div></article></div></section>
+    </main>
+  </div>
+
+  <div class="mobile-nav"><button class="active" data-page="chat"><span>✦</span>对话</button><button data-page="today"><span>◫</span>今日</button><button data-page="trend"><span>⌁</span>趋势</button></div>
+
+  <div class="modal-mask" id="toolMask" hidden><section class="modal tool-modal" role="dialog" aria-modal="true" aria-labelledby="toolTitle"><button class="modal-close" aria-label="关闭" data-close="toolMask">×</button><div class="modal-icon" id="toolIcon">✓</div><span class="eyebrow" id="editorEyebrow">TOOL CALL</span><h2 id="toolTitle">确认记录</h2><p class="modal-lead" id="toolLead">确认后才会写入你的本地记录。</p><div id="toolEditor" class="tool-editor"></div><div class="modal-actions record-actions"><button class="danger-button" id="deleteRecordBtn" hidden>删除记录</button><button class="ghost-button" id="rejectToolBtn">不记录</button><button class="primary-button" id="confirmToolBtn">确认记录</button></div></section></div>
+
+  <div class="modal-mask" id="settingsMask" hidden><section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><button class="modal-close" aria-label="关闭" data-close="settingsMask">×</button><span class="eyebrow">PREFERENCES</span><h2 id="settingsTitle">设置</h2><div class="settings-tabs"><button class="active" data-tab="profile">个人档案</button><button data-tab="model">AI 模型</button><button data-tab="search">联网搜索</button><button data-tab="data">数据与隐私</button></div>
+    <div class="settings-pane active" data-pane="profile"><div class="form-grid"><label><span>性别</span><select id="profileGender"><option value="male">男</option><option value="female">女</option></select></label><label><span>年龄</span><input id="profileAge" type="number" min="10" max="100"><em>岁</em></label><label><span>身高</span><input id="profileHeight" type="number" min="100" max="250"><em>cm</em></label><label><span>当前 / 起始体重</span><input id="profileStart" type="number" step="0.1" min="20" max="300"><em>kg</em></label><label><span>目标体重</span><input id="profileTarget" type="number" step="0.1" min="20" max="300"><em>kg</em></label><label><span>每周目标</span><select id="profileWeekly"><option value="0">保持</option><option value="0.25">减 0.25 kg</option><option value="0.5">减 0.5 kg</option><option value="0.75">减 0.75 kg</option><option value="1">减 1 kg</option></select></label><label class="wide"><span>日常活动水平</span><select id="profileActivity"><option value="1.2">久坐 / 很少活动</option><option value="1.35">轻度活动</option><option value="1.5">中度活动</option><option value="1.7">高度活动</option></select></label></div></div>
+    <div class="settings-pane" data-pane="model"><div class="notice"><b>OpenAI 兼容接口</b><span>API Key 仅保存在本机；对话时会发送本次输入、近期记录与档案。</span></div><div class="form-grid one"><label><span>API Base URL</span><input id="modelBase" type="url" placeholder="https://api.deepseek.com/v1"></label><label><span>文本 / Agent 模型</span><input id="modelName" placeholder="deepseek-chat"></label><label><span>API Key</span><input id="modelKey" type="password" autocomplete="off" placeholder="留空保持原 Key"></label><label class="check-label"><input type="checkbox" id="visionEnabled"><span>允许图片识别（使用同一个模型配置）</span></label></div><div class="inline-actions"><button class="soft-button" id="testModelBtn">测试模型</button><span id="testModelStatus"></span></div></div>
+    <div class="settings-pane" data-pane="search"><div class="notice"><b>Tavily 联网搜索</b><span>AI 按需查找公开营养资料，回复展示来源。API Key 只保存在本机，不发送给模型。</span></div><div class="form-grid one"><label><span>Tavily API Key</span><input id="tavilyKey" type="password" autocomplete="off" placeholder="tvly-…"></label><label class="check-label"><input type="checkbox" id="searchEnabled"><span>启用联网搜索</span></label></div><p class="search-help">每轮最多 2 次 advanced 搜索，每次最多返回 8 条摘要；测试连接也会发起一次查询，额度以 Tavily 实际计费为准。关闭后不调用 Tavily。仅发送 AI 提炼的查询词，不主动发送档案或完整对话。<a href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer">获取 API Key ↗</a></p><div class="inline-actions"><button class="soft-button" id="testSearchBtn">测试连接</button><button class="ghost-button" id="clearSearchKeyBtn">移除已保存 Key</button></div><p id="testSearchStatus" role="status"></p></div>
+    <div class="settings-pane" data-pane="data"><div class="privacy-list"><div><i>⌂</i><span><b>记录留在本机</b><small>饮食、运动、体重和对话保存在本地 SQLite。</small></span></div><div><i>↗</i><span><b>AI 请求按需发送</b><small>仅发送回答所需的本次输入、档案和近况摘要。</small></span></div><div><i>◌</i><span><b>联网搜索由你控制</b><small>开启时按需发送查询词给 Tavily，展示来源与查询时间；关闭时品牌数据只作估算。</small></span></div></div><div class="inline-actions"><button class="soft-button" id="exportBtn">导出备份</button><label class="soft-button file-label">导入备份<input id="importInput" type="file" accept="application/json" hidden></label></div></div>
+    <div class="modal-actions"><button class="ghost-button" data-close="settingsMask">取消</button><button class="primary-button" id="saveSettingsBtn">保存设置</button></div></section></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
