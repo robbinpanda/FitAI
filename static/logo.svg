@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><title>渐渐飞：由重到轻，向上飞</title><defs><linearGradient id="tile" x1="4" y1="62" x2="59" y2="3" gradientUnits="userSpaceOnUse"><stop stop-color="#C95534"/><stop offset="1" stop-color="#E78255"/></linearGradient><radialGradient id="sphere" cx="0" cy="0" r="1" gradientTransform="translate(17 37) rotate(48) scale(25)" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFDF5"/><stop offset="1" stop-color="#F3DAB7"/></radialGradient></defs><rect width="64" height="64" rx="20" fill="url(#tile)"/><path d="M35 50C45 46 51 36 53 26" stroke="#FFE8CD" stroke-opacity=".65" stroke-width="1.7" stroke-linecap="round"/><circle cx="21" cy="43" r="12" fill="url(#sphere)"/><circle cx="37" cy="28" r="7" fill="#FFF1D9"/><circle cx="49" cy="14.5" r="4.5" fill="#FFFCF4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>渐渐飞：向上飞的彗星</title>
+  <rect width="64" height="64" rx="20" fill="#D96643"/>
+  <path d="M11 52C22 43 23 32 29 22C33 15 40 12 46 16C53 20 54 29 48 35C42 41 33 39 25 44C19 48 15 51 11 52Z" fill="#FFF7E8"/>
+</svg>
