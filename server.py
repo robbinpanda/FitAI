@@ -1115,6 +1115,7 @@ AGENT_SYSTEM = """你是 简减肥，一个可靠、克制、有同理心的私�
 
 【强制触发条件】
 - 用户明确表示已经吃了/喝了某个具体内容，或明确要求记录具体饮食：必须调用 log_meal。已知食物名称或图片可识别出食物即可生成待确认记录；份量不精确时允许合理估算并降低 confidence。
+- 照片中能识别食物，用户说“我吃了两个”，就是吃了两个该食物；按常见单个可食重量估算并说明假设，直接给待确认卡片，不要再问是否真是两个。“行/对/两颗某食物”等是在承接尚未生成卡片的记录请求。卡片确认才会保存，不需要在聊天里再确认一遍数量。
 - 用户明确表示已经完成某项具体运动，且有时长，或明确要求记录带时长的具体运动：必须调用 log_exercise。缺强度可按中等强度估算；缺运动项目或时长才询问最少缺失信息。
 - 用户报告了具体体重数值或明确要求记录该数值：必须调用 log_weight。没有体重数值时才询问。
 - 用户要求修改、删除、恢复已有记录：必须使用管理工具。最新上下文没有能唯一定位的真实 ID 时，必须先调用 query_records；不得只解释操作方法或口头声称会处理。
@@ -1180,6 +1181,7 @@ AGENT_SYSTEM = """你是 简减肥，一个可靠、克制、有同理心的私�
 - log_exercise 的 arguments 包含 date,items；items 每项包含 type,minutes,met,kj,confidence,note。项目和时长必须来自用户，强度未给可明确按估算处理。
 - log_weight 的 arguments 包含 date,weight,note；weight 必须来自用户本次提供或明确指代的称重数值。
 - 不需要工具时 tool_calls 必须是 []。
+- 仅当确实无法识别食物种类、无法确定图片中吃的是哪一种时，可返回 clarification:"food_identity" 并问清食物种类；缺精确克重、营养估算或卡片确认不属于此情况，必须合理估算并生成待确认记录。
 - 每个数值必须是 JSON 数字，不带单位。饮食每项必须有 name, amount, grams, kj, protein, carb, fat；运动每项必须有 type, minutes, met, kj。
 - 日期默认使用上下文中的“当前记录日期”。餐次根据当地时间和用户表达判断，无法判断用“其他”。
 - 回复一般控制在 300 字以内。""" + "\n\n" + ENERGY_KNOWLEDGE
@@ -1188,6 +1190,7 @@ AGENT_SCHEMA = {
     "type": "object",
     "properties": {
         "reply": {"type": "string"},
+        "clarification": {"type": "string", "enum": ["food_identity"]},
         "tool_calls": {
             "type": "array",
             "items": {
@@ -2346,7 +2349,6 @@ def day_summary(d):
     # Do not extrapolate a few logged foods into a full-day weight prediction.
     predict_delta = None
     profile_ready = bool(prof.get("completed") or prof.get("updated_at"))
-    has_any_weight = latest_weight() is not None
     return {
         "date": d,
         "weight": wr["display_weight"],
@@ -2378,7 +2380,7 @@ def day_summary(d):
         "macro_targets": macro_targets(wr["calc_weight"], energy["target_intake"]),
         "profile": prof,
         "profile_ready": profile_ready,
-        "needs_setup": not (profile_ready and has_any_weight),
+        "needs_setup": not profile_ready,
         "energy_unit": "kJ",
     }
 
@@ -2658,6 +2660,55 @@ def agent_entry_reply(question, images):
     if text in ("今天记完了", "完成今日记录", "今天的记录完成了", "今天已经记完了"):
         return "好的，已有记录已自动汇总，不需要额外完成步骤。之后也能随时补充、修改或删除。"
     return None
+
+
+def meal_draft_request(question, images, prior=()):
+    """Conservative guard for explicit intake and its unresolved follow-up.
+
+    Prior rows are newest first. Stop at an existing tool, a different topic or
+    a negation: a short acknowledgement must never duplicate an old record.
+    The model still identifies food/estimates portions; this guard creates no data.
+    """
+    def text(value):
+        return re.sub(r"[\s，。！、,.!：:]+", "", value or "")
+
+    def excluded(value):
+        return bool(re.search(r"[?？]|没吃|没喝|没再吃|没再喝|不吃|不喝|不记录|不用记|别记|不要记|不记了|算了|取消|假如|如果|假设|打算|计划|准备|想吃|想喝|明天|后天|能吃|可以吃|能喝|可以喝|吃了吗|喝了吗|热量多少|多少热量|会胖|会不会|怎么办|建议|修改|改成|改为|删|撤销|恢复|查一下", value))
+
+    def explicit(value, has_images):
+        if (excluded(value) or agent_entry_reply(value, []) or
+                re.search(r"比如|例如|举例|他说|她说|(?:他|她|别人|朋友|孩子|宝宝)(?:刚|已经|今天|昨天)?(?:吃|喝)", value)):
+            return False
+        hit = re.search(r"(?:吃了|喝了|吃完了|喝完了|吃的是|喝的是|吃过了|喝过了|帮我记录|帮我记下|记录一下)(.+)", value)
+        if not hit:
+            return False
+        food = hit[1].strip()
+        vague = bool(re.fullmatch(r"(?:[零一二两三四五六七八九十半\d.]+)?(?:个|颗|份|口|碗|杯|块|片|只)?(?:这个|那个|这些|东西|图里的|图片里的|照片里的)?", food))
+        return bool(food and (has_images or not vague))
+
+    current = text(question)
+    if excluded(current):
+        return False
+    if explicit(current, bool(images)):
+        return True
+    # Food/portion clarification is only intake when continuing a recent request.
+    acknowledgement = r"(?:行|好|好的|好呀|嗯|对|对的|是|是的|没错|确认|可以|就这些|就是这些|帮我记吧|记吧)"
+    portion = r"(?:就是|是|就|大概|大约|约)?[零一二两三四五六七八九十半\d.]+(?:个|颗|份|口|碗|杯|块|片|只|克|g|kg|毫升|ml).{0,24}"
+    if not (re.fullmatch(acknowledgement, current) or re.fullmatch(portion, current)):
+        return False
+    for turn in list(prior)[:8]:
+        if turn.get("role") == "assistant":
+            if _json_column(turn.get("tool_calls"), []):
+                return False
+            continue
+        previous = text(turn.get("content"))
+        if excluded(previous):
+            return False
+        if explicit(previous, bool(coach_image_payloads(turn))):
+            return True
+        if not (re.fullmatch(acknowledgement, previous) or re.fullmatch(portion, previous)):
+            return False
+    return False
 
 
 def normalize_agent_tool_call(call, default_date):
@@ -3152,6 +3203,10 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
         schema["properties"]["tool_calls"]["items"]["properties"]["name"]["enum"].append("search_web")
     default_date = settings.get("_record_date") or date.today().isoformat()
     sources, errors, search_count, read_count, quality_retries = [], [], 0, 0, 0
+    draft_required = bool(settings.get("_meal_draft_required"))
+    draft_retries = 0
+    if draft_required:
+        messages[0]["content"] += "\n【本轮记录约束】用户已明确表达摄入或正在补充尚未成卡的饮食记录。本轮必须返回 log_meal 待确认卡片；可估算克重并写明假设，不用先在聊天里确认份量。只有真正无法识别食物种类才可用 clarification:food_identity 提问。"
     search_data = None
     def event(kind, data):
         if on_event:
@@ -3182,6 +3237,8 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
         try:
             payload = extract_json(out.get("content") or "")
         except RuntimeError:
+            if draft_required:
+                raise ApiError("AI 未返回有效的待确认饮食记录，请重试；本次尚未保存饮食", status=502)
             return out, search_data
         calls = payload.get("tool_calls", []) if isinstance(payload, dict) else []
         reads = [x for x in calls if isinstance(x, dict) and x.get("name") in AGENT_READ_TOOLS + ("search_web",)] if isinstance(calls, list) else []
@@ -3195,11 +3252,31 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
                     raise ApiError("品牌食品在生成记录前必须完成联网查询，请重试", status=502)
                 reads = [{"name": "search_web", "arguments": {"query": forced_query}}]
         if not reads:
+            meal_items = list(_agent_log_meal_items(payload))
+            needs_identity = (quality_retries == 0 and isinstance(payload, dict) and payload.get("clarification") == "food_identity"
+                              and not calls and bool(payload.get("reply")))
+            if draft_required and not meal_items and not needs_identity:
+                if phase == 3 or draft_retries >= 2:
+                    raise ApiError("AI 未生成待确认饮食记录，请重试；本次尚未保存饮食", status=502)
+                draft_retries += 1
+                event("reply", {"text": ""})
+                event("status", {"text": "正在整理待确认饮食记录…"})
+                messages.append({"role": "assistant", "content": out["content"]})
+                messages.append({"role": "user", "content":
+                    "程序检查：原始请求是已吃食物或其数量补充，但你没有返回 log_meal。"
+                    "请依据原始请求和图片生成待确认卡片，不能只口头承诺、只报热量或反复确认已给出的数量。"
+                    "不清楚精确克重时按常见可食重量估算，在 note 写明假设、降低 confidence。"
+                    "营养须按实际份量缩放并通过17/17/37一致性校验。不要虚构未识别的食物；"
+                    "只有食物种类确实无法判断时返回 clarification:food_identity 并提出具体问题。"})
+                continue
             issues = _agent_meal_quality_issues(payload)
             if issues:
                 if phase == 3 or quality_retries >= 2:
                     raise ApiError("AI 营养估算未通过一致性校验，请重试", status=502)
                 quality_retries += 1
+                # A failed nutritional estimate must be repaired, not silently
+                # replaced with prose that loses the user's pending meal.
+                draft_required = True
                 event("reply", {"text": ""})
                 event("status", {"text": "正在复核份量与营养数据…"})
                 messages.append({"role": "assistant", "content": out["content"]})
@@ -3207,9 +3284,9 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
                     "role": "user",
                     "content": "程序质量审查未通过：" + "；".join(issues) +
                                "。请先核对实际入口克重、每100g/每份、熟重/生重和单位，再拆分份量和油/酱；"
-                               "未知营养不能填零，份量无法判断时先追问，不生成该项记录。"
+                               "未知营养不能填零；常见食物只有精确克重未知时，合理估算并注明假设，保留 log_meal 待确认卡片。"
                                "标签值保留来源口径，正确按实际摄入缩放；非标签项使用17/17/37 kJ/g复算，"
-                               "能量与三大营养素差异不得超过20%。不要沿用原来的矛盾数字。",
+                               "能量与三大营养素差异不得超过20%。不要沿用原来的矛盾数字，也不要通过删除工具调用来绕过复核。",
                 })
                 continue
             return out, search_data
@@ -4353,6 +4430,7 @@ class Handler(BaseHTTPRequestHandler):
 
             settings = get_settings()
             settings["_record_date"] = d
+            settings["_meal_draft_required"] = meal_draft_request(question, images, prior)
             if images and not settings.get("vision_enabled"):
                 raise ApiError("请先在设置中启用视觉模型", field="images")
             if images and settings.get("vision_mode") == "custom":
@@ -4369,6 +4447,9 @@ class Handler(BaseHTTPRequestHandler):
             ctx = agent_context(d, summ, hist, question)
             ctx["本轮输入意图"] = {"meal": "准备记录饮食；内容以本次输入为准", "exercise": "准备记录运动；内容以本次输入为准", "weight": "准备记录体重；数值以本次输入为准"}.get(recording_intent, "普通对话；按用户实际语义判断")
             messages = [{"role": "system", "content": AGENT_SYSTEM}]
+            # Carry at most the latest relevant image turn into an unresolved
+            # meal follow-up, so short quantity answers do not lose visual context.
+            image_turn_id = next((turn["id"] for turn in prior if turn["role"] == "user" and coach_image_payloads(turn)), None)
             for turn in reversed(prior):
                 content = turn.get("content") or ""
                 previous_images = coach_image_payloads(turn)
@@ -4385,6 +4466,11 @@ class Handler(BaseHTTPRequestHandler):
                 sources = _json_column(turn.get("search_data"), None)
                 if sources:
                     content += "\n[此前联网参考来源（非本轮检索）：" + json.dumps(sources, ensure_ascii=False) + "]"
+                if (not images and settings["_meal_draft_required"] and settings.get("vision_enabled")
+                        and (not meal_draft_request(question, images) or re.search(r"图|这个|那个|这些|那些", question))
+                        and turn["id"] == image_turn_id and settings.get("vision_mode") != "custom"):
+                    content = [{"type": "text", "text": content}] + [
+                        {"type": "image_url", "image_url": {"url": img}} for img in previous_images]
                 messages.append({"role": turn["role"], "content": content})
             prompt = "这是本轮最新的用户数据与请求（JSON）：\n" + json.dumps(ctx, ensure_ascii=False)
             if images:

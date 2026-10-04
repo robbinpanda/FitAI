@@ -92,6 +92,29 @@ class ModelCompatibilityTests(unittest.TestCase):
                 server._request_stream("https://example.test/v1/chat/completions", "test-key", {}, 5)
 
 
+class MealIntentTests(unittest.TestCase):
+    def test_photo_intake_and_unresolved_quantity_followups(self):
+        prior = [{"role": "assistant", "content": "是冬枣，请确认数量", "tool_calls": "[]"},
+                 {"role": "user", "content": "我吃了两个", "images": '["test-image"]'}]
+        self.assertTrue(server.meal_draft_request("我吃了两个", ["test-image"]))
+        for question in ("行", "两颗冬枣", "就是两颗", "对的"):
+            with self.subTest(question=question):
+                self.assertTrue(server.meal_draft_request(question, [], prior))
+        self.assertFalse(server.meal_draft_request("我吃了两个", []))
+
+    def test_questions_cancellations_and_existing_tools_do_not_repeat_meals(self):
+        prior = [{"role": "assistant", "tool_calls": "[]"},
+                 {"role": "user", "content": "我吃了两颗冬枣"}]
+        for question in ("还没吃", "我没吃了", "明天想吃两个", "如果我吃了两个", "两个会胖吗", "热量多少？", "不用记了", "算了", "记录饮食", "他吃了两个鸡蛋", "比如我吃了两个鸡蛋"):
+            with self.subTest(question=question):
+                self.assertFalse(server.meal_draft_request(question, [], prior))
+        for status in ("pending", "confirmed", "rejected"):
+            prior[0]["tool_calls"] = json.dumps([{"name": "log_meal", "status": status}])
+            self.assertFalse(server.meal_draft_request("行", [], prior))
+            self.assertFalse(server.meal_draft_request("两颗冬枣", [], prior))
+        self.assertFalse(server.meal_draft_request("两颗冬枣", []))
+
+
 class AgentTests(unittest.TestCase):
     def setUp(self):
         with server.db() as c:
@@ -197,6 +220,34 @@ class AgentTests(unittest.TestCase):
         sid = self.request("POST", "/api/coach/session/create", {"date": d})[1]["session"]["id"]
         code, _ = self.request("POST", "/api/agent", {"session_id": sid, "date": d, "question": "你好", "recording_intent": "record_fake_food"})
         self.assertEqual(code, 400)
+
+    def test_photo_quantity_followup_produces_pending_card_without_saving(self):
+        d = server.date.today().isoformat()
+        sid = self.request("POST", "/api/coach/session/create", {"date": d})[1]["session"]["id"]
+        image = ("data:image/png;base64,"
+                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+        with server.db() as c:
+            c.execute("UPDATE settings SET vision_enabled=1,vision_mode='inherit' WHERE id=1")
+            c.execute("INSERT INTO coach_messages(session_id,role,content,images,created_at) VALUES(?,?,?,?,?)",
+                      (sid, "user", "我吃了两个", json.dumps([image]), "now"))
+            c.execute("INSERT INTO coach_messages(session_id,role,content,tool_calls,created_at) VALUES(?,?,?,?,?)",
+                      (sid, "assistant", "图片里是鸡蛋，请确认数量", "[]", "now"))
+        empty = {"content": '{"reply":"确认数量后再记录","tool_calls":[]}'}
+        before = len(server.day_summary(d)["meals"])
+        with mock.patch.object(server, "call_model", side_effect=[empty, self.model_result()]) as model:
+            code, answer = self.request("POST", "/api/agent", {"session_id": sid, "date": d, "question": "两个鸡蛋"})
+        self.assertEqual(code, 200)
+        self.assertEqual(answer["tool_calls"][0]["status"], "pending")
+        self.assertEqual(len(server.day_summary(d)["meals"]), before)
+        sent = model.call_args.args[3]
+        self.assertTrue(any(isinstance(m["content"], list) and any(
+            p.get("image_url", {}).get("url") == image for p in m["content"]) for m in sent))
+        # An acknowledgement after an existing card must not force a second card.
+        with mock.patch.object(server, "call_model", return_value={"content": '{"reply":"请在卡片里确认","tool_calls":[]}'}) as model:
+            code, answer = self.request("POST", "/api/agent", {"session_id": sid, "date": d, "question": "行"})
+        self.assertEqual(code, 200)
+        self.assertEqual(answer["tool_calls"], [])
+        self.assertNotIn("【本轮记录约束】", model.call_args.args[3][0]["content"])
 
     def test_pending_then_confirm_or_reject(self):
         d = server.date.today().isoformat()
@@ -414,6 +465,38 @@ class SearchTests(unittest.TestCase):
         self.assertIsNone(data)
         self.assertIn("3150", out["content"])
         self.assertIn("程序质量审查未通过", model.call_args.args[3][-1]["content"])
+
+    def test_explicit_intake_cannot_end_in_an_empty_promise(self):
+        empty = {"content": json.dumps({"reply": "请确认数量，我再整理", "tool_calls": []})}
+        good = self.meal_reply(name="冬枣", kj=170, protein=.4, carb=9, fat=.1)
+        with mock.patch.object(server, "call_model", side_effect=[empty, good]) as model:
+            out, _ = server.run_agent_model("url", "key", "model", self.messages(), {"_meal_draft_required": True})
+        self.assertEqual(model.call_count, 2)
+        self.assertIn("log_meal", out["content"])
+
+    def test_nutrition_repair_cannot_discard_the_pending_meal(self):
+        bad = self.meal_reply(name="冬枣", kj=90, protein=.4, carb=9, fat=.1)
+        empty = {"content": json.dumps({"reply": "90 kJ 与9克碳水自洽，请称重", "tool_calls": []})}
+        good = self.meal_reply(name="冬枣", kj=170, protein=.4, carb=9, fat=.1)
+        with mock.patch.object(server, "call_model", side_effect=[bad, empty, good]) as model:
+            out, _ = server.run_agent_model("url", "key", "model", self.messages(), {})
+        self.assertEqual(model.call_count, 3)
+        self.assertIn("log_meal", out["content"])
+        self.assertFalse(server._agent_meal_quality_issues(json.loads(out["content"])))
+
+    def test_missing_tool_retry_is_bounded_and_does_not_report_success(self):
+        empty = {"content": '{"reply":"稍后记录","tool_calls":[]}'}
+        with mock.patch.object(server, "call_model", return_value=empty) as model:
+            with self.assertRaisesRegex(server.ApiError, "未生成待确认饮食记录"):
+                server.run_agent_model("url", "key", "model", self.messages(), {"_meal_draft_required": True})
+        self.assertEqual(model.call_count, 3)
+
+    def test_unrecognizable_food_can_still_ask_for_its_identity(self):
+        unclear = {"content": json.dumps({"reply": "照片太模糊，是哪种食物？", "tool_calls": [], "clarification": "food_identity"})}
+        with mock.patch.object(server, "call_model", return_value=unclear) as model:
+            out, _ = server.run_agent_model("url", "key", "model", self.messages(), {"_meal_draft_required": True})
+        self.assertEqual(model.call_count, 1)
+        self.assertEqual(json.loads(out["content"])["tool_calls"], [])
 
     def test_failed_search_does_not_interrupt_chat(self):
         with mock.patch.object(server, "call_model", side_effect=[self.search_reply(), {"content": '{"reply":"搜索失败，以下是估算","tool_calls":[]}'}]) as model, \

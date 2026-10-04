@@ -30,6 +30,17 @@ class DirectTests(unittest.TestCase):
     def setUp(self):
         _fresh_db()
 
+    def test_setup_is_completed_without_daily_weight_records(self):
+        d = server.date.today().isoformat()
+        self.assertTrue(server.day_summary(d)["needs_setup"])
+        server.save_profile({"age": 30, "height": 170, "start_weight": 80, "completed": True})
+        self.assertIsNone(server.latest_weight())
+        self.assertFalse(server.day_summary(d)["needs_setup"])
+        with server.db() as c:
+            c.execute("UPDATE profile SET completed=0 WHERE id=1")
+        # Older profiles with an explicit saved timestamp also count as set up.
+        self.assertFalse(server.day_summary(d)["needs_setup"])
+
     def test_t01_empty_no_fake_weight(self):
         d = server.date.today().isoformat()
         s = server.day_summary(d)
