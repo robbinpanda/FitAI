@@ -19,6 +19,39 @@ import server  # noqa: E402
 
 
 class ModelCompatibilityTests(unittest.TestCase):
+    def test_deepseek_uses_supported_json_mode(self):
+        with mock.patch.object(server, "_request_stream", return_value=("", '{"ok":true}', {})) as request:
+            server.call_model("https://api.deepseek.com/v1", "test-key", "deepseek-flash", [],
+                              json_schema=server.AGENT_SCHEMA)
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_args.args[2]["response_format"], {"type": "json_object"})
+
+    def test_shared_key_allows_format_compatibility_retry(self):
+        shared = {"api_key": "private-shared-key", "base_url": "https://example.test/v1", "text_model": "test-model"}
+        with mock.patch.object(server, "shared_defaults", return_value=shared), \
+                mock.patch.object(server, "_request_stream", side_effect=[
+                    RuntimeError("400 unsupported response_format"), ("", '{"ok":true}', {}),
+                ]) as request:
+            out = server.call_model(shared["base_url"], shared["api_key"], shared["text_model"], [],
+                                    json_schema=server.AGENT_SCHEMA)
+        self.assertEqual(out["content"], '{"ok":true}')
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args.args[2]["response_format"], {"type": "json_object"})
+
+    def test_shared_key_errors_remain_private_after_retries(self):
+        shared = {"api_key": "private-shared-key", "base_url": "https://example.test/v1", "text_model": "test-model"}
+        for code, expected_calls in [(401, 1), (402, 1), (400, 6)]:
+            with self.subTest(code=code), mock.patch.object(server, "shared_defaults", return_value=shared), \
+                    mock.patch.object(server, "_request_stream", side_effect=RuntimeError(
+                        str(code) + " private-shared-key upstream-details")) as request:
+                with self.assertRaises(RuntimeError) as error:
+                    server.call_model(shared["base_url"], shared["api_key"], shared["text_model"], [],
+                                      json_schema=server.AGENT_SCHEMA, want_reasoning=False)
+                self.assertNotIn("private-shared-key", str(error.exception))
+                self.assertNotIn("upstream-details", str(error.exception))
+                self.assertIn(str(code), str(error.exception))
+                self.assertEqual(request.call_count, expected_calls)
+
     def test_reasoning_only_response_retries_with_thinking_disabled(self):
         with mock.patch.object(server, "_request_stream", side_effect=[
             ("reasoning only", "", {"completion_tokens": 4096}),

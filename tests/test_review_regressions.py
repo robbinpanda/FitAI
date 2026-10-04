@@ -54,6 +54,23 @@ class BackupValidationTests(unittest.TestCase):
         for key in ("meals", "exercises", "weights", "day_flags", "energy_unit", "display_unit"):
             self.assertEqual(restored[key], source[key])
 
+    def test_rebrand_preserves_legacy_backup_records(self):
+        source = server.build_export()
+        self.assertEqual(source["app"], "简减肥")
+        for name in ("简减肥", "渐渐飞", "FitAI"):
+            with self.subTest(name=name):
+                legacy = copy.deepcopy(source)
+                legacy["app"] = name
+                server.apply_import(legacy)
+                restored = server.build_export()
+                self.assertEqual(restored["app"], "简减肥")
+                # Import assigns fresh SQLite row IDs; the recorded values must survive.
+                values = lambda rows: [{k: row[k] for k in ("date", "weight", "note")} for row in rows]
+                self.assertEqual(values(restored["weights"]), values(source["weights"]))
+                for key in ("gender", "age", "height", "activity", "start_weight",
+                            "target_weight", "weekly_loss", "completed"):
+                    self.assertEqual(restored["profile"][key], source["profile"][key])
+
     def test_exercise_invalid_energy_is_not_silently_estimated(self):
         for value in (-100, float("nan"), float("inf"), "bad"):
             with self.subTest(value=value), self.assertRaises(server.ApiError):

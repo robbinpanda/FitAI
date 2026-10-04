@@ -1,18 +1,48 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · 渐渐飞</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/auth.css"><link rel="icon" type="image/svg+xml" href="/logo.svg"><link rel="stylesheet" href="/brand.css"></head>
-<body class="auth-page"><main class="auth-card"><a class="auth-back" href="/">← 返回渐渐飞首页</a>
-  <div class="brand"><div class="brand-mark"><img src="/logo.svg" alt="" width="40" height="40"></div><div><strong>渐渐飞</strong><span>你的减脂 Agent</span></div></div>
-  <p id="modeHint">正在连接…</p><h1 id="authTitle">欢迎回来</h1>
-  <p>登录后，继续你的饮食、运动与体重记录。</p>
-  <form id="authForm">
-    <label for="username">用户名</label><input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}" required placeholder="3–32 位字母、数字、下划线或短横线">
-    <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required placeholder="至少 12 个字符">
-    <div id="confirmField" hidden><label for="confirmPassword">确认密码</label><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128"></div>
-    <div id="inviteField" hidden><label for="invite">邀请码</label><input id="invite" type="password" autocomplete="off" maxlength="128" placeholder="向管理员获取邀请码"></div>
-    <p id="authError" role="alert"></p><button class="primary-button" id="submitAuth" type="submit" disabled>登录</button>
-  </form>
-  <button class="text-button" id="toggleAuth" disabled>没有账号？注册</button>
-  <p class="auth-help" id="registrationHint"></p>
-  <p class="auth-help">忘记密码请联系部署管理员。账号不会在本地版和服务器版之间自动同步。</p>
-</main><script src="/auth.js"></script></body></html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#fafaf9">
+  <title>登录 · 简减肥</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg?v=jianjianfei-2">
+  <link rel="stylesheet" href="/public.css?v=jianjianfei-2">
+  <link rel="stylesheet" href="/auth.css?v=20261004">
+</head>
+<body class="auth-page public-page">
+  <a class="skip" href="#authTitle">跳到登录表单</a>
+  <header class="auth-header wrap">
+    <a class="logo" href="/" aria-label="简减肥首页"><img src="/logo.svg?v=jianjianfei-2" alt="" width="32" height="32"><b>简减肥</b></a>
+    <a class="auth-back" href="/">返回首页 <span aria-hidden="true">↗</span></a>
+  </header>
+  <main class="auth-layout wrap">
+    <section class="auth-story" aria-labelledby="storyTitle">
+      <p class="eyebrow">一点一滴，轻盈向前</p>
+      <h2 id="storyTitle">好好生活。<br>慢慢，<span>遇见轻盈。</span></h2>
+      <p class="story-lead">把记录交给简减肥，<br>把生活的重心，留给自己。</p>
+      <div class="story-preview" aria-label="日常记录示例">
+        <div class="story-preview-head"><img src="/logo.svg?v=jianjianfei-2" alt="" width="30" height="30"><span>每一点努力，都值得被看见。</span></div>
+        <div class="story-entry"><span class="entry-icon" aria-hidden="true">↗</span><div><b>晚饭后，散步半小时。</b><span>运动记录 · 等你确认</span></div><span class="entry-time">今天</span></div>
+        <div class="story-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <p class="story-caption">不必追求完美，开始记录就很好。<span>产品示意</span></p>
+      </div>
+      <p class="story-bottom">饮食 · 运动 · 体重 <span>你的日常，都有迹可循。</span></p>
+    </section>
+    <section class="auth-card" aria-labelledby="authTitle">
+      <div class="auth-heading"><img src="/logo.svg?v=jianjianfei-2" alt="" width="44" height="44"><p id="modeHint" class="eyebrow" role="status">正在连接…</p><h1 id="authTitle">欢迎回来。</h1><p id="authDescription">登录简减肥，接着记录你的每一天。</p></div>
+      <form id="authForm">
+        <div class="auth-field"><label for="username">用户名</label><input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}" required placeholder="输入你的用户名" aria-describedby="usernameHint"><small id="usernameHint" hidden>3–32 位字母、数字、下划线或短横线</small></div>
+        <div class="auth-field"><label for="password">密码</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required placeholder="至少 12 个字符"><button id="showPassword" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div></div>
+        <div id="confirmField" class="auth-field" hidden><label for="confirmPassword">确认密码</label><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="再次输入密码"></div>
+        <div id="inviteField" class="auth-field" hidden><label for="invite">邀请码</label><input id="invite" type="password" autocomplete="off" maxlength="128" placeholder="输入管理员提供的邀请码"></div>
+        <p id="authError" role="alert"></p>
+        <button class="button auth-submit" id="submitAuth" type="submit" disabled>登录</button>
+      </form>
+      <button class="auth-toggle" id="toggleAuth" type="button" disabled>没有账号？注册</button>
+      <div class="auth-notes"><p id="registrationHint"></p><p>忘记密码？请联系管理员。</p></div>
+    </section>
+  </main>
+  <footer class="auth-footer wrap"><span>把减脂，变简单。</span><span>用小小的记录，陪伴每一天。</span></footer>
+  <script src="/auth.js?v=jianjianfei-2"></script>
+</body>
+</html>

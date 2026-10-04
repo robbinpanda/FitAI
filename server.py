@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-渐渐飞 - 个人减肥助手 · 本地服务端
+简减肥 - 个人减肥助手 · 本地服务端
 零第三方依赖，仅使用 Python 标准库。
 数据全部存放在本机 data/fitai.db（SQLite），API Key 也只存在本机。
 启动：python server.py
@@ -46,7 +46,8 @@ JOB_TTL = 900
 JOB_MAX_RUNNING = 2
 JOB_MAX_OUTPUT = 180000
 JOB_HARD_TIMEOUT = MODEL_TIMEOUT + 90
-APP_NAME = "渐渐飞"
+APP_NAME = "简减肥"
+LEGACY_APP_NAMES = ("渐渐飞", "FitAI")
 APP_VERSION = "2.0"
 SCHEMA_VERSION = 5
 COACH_MAX_IMAGES = 4
@@ -1101,7 +1102,7 @@ AGENT_MANAGEMENT_TOOLS = ("update_meal", "update_exercise", "update_weight", "de
 AGENT_READ_TOOLS = ("query_records", "get_day_summary")
 AGENT_TOOLS = ("log_meal", "log_exercise", "log_weight") + AGENT_MANAGEMENT_TOOLS
 
-AGENT_SYSTEM = """你是 渐渐飞，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
+AGENT_SYSTEM = """你是 简减肥，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
 
 【工具调用是任务的一部分】
 不要把工具调用当成可选的补充。每轮先判断用户是在要求执行记录/管理/查询，还是只想咨询；一旦命中下述触发条件，必须在本轮 tool_calls 中返回匹配工具，不能只用 reply 口头答应、复述参数、建议用户手动操作，或让用户再次提醒你调用工具。
@@ -1731,11 +1732,29 @@ def call_model(base_url, api_key, model, messages, timeout=MODEL_TIMEOUT,
             {"type": "json_object"},
             None,
         ]
+        # DeepSeek supports JSON mode, but rejects response_format=json_schema.
+        # Keep application-side schema validation, without an avoidable 400 per turn.
+        if urllib.parse.urlparse(base_url).hostname == "api.deepseek.com":
+            formats = formats[1:]
     else:
         formats = [None]
 
     last_err = None
     rate_tries = 0
+    uses_shared_key = bool(shared.get("api_key") and api_key == shared["api_key"])
+
+    def public_error(error):
+        if not uses_shared_key:
+            return error
+        # Sanitize only at the user boundary, after compatibility retries.
+        code = re.search(r"\b(400|401|402|403|404|413|415|422|429|500|502|503|504)\b", str(error))
+        status = code[0] if code else ""
+        tip = {
+            "400": "站点默认模型请求参数不兼容（400），请联系管理员",
+            "402": "站点默认模型余额不足（402），请联系管理员",
+            "429": "站点默认模型请求较多（429），请稍后重试",
+        }.get(status, "站点默认模型暂时不可用" + ("（" + status + "）" if status else "") + "，请稍后重试或联系管理员")
+        return RuntimeError(tip)
     # Omission does not disable thinking on providers whose models enable it
     # by default. Explicitly disable it, then fall back to omission for gateways
     # which reject the provider-specific field.
@@ -1767,23 +1786,20 @@ def call_model(base_url, api_key, model, messages, timeout=MODEL_TIMEOUT,
                     continue
                 return {"reasoning": r, "content": c, "usage": usage}
             except RuntimeError as e:
-                if shared.get("api_key") and api_key == shared["api_key"]:
-                    code = re.search(r"\b(400|401|402|403|404|415|422|429|500|502|503)\b", str(e))
-                    raise RuntimeError("站点默认模型暂时不可用" + ("（" + code[0] + "）" if code else "") + "，请稍后重试或填写自己的 API Key") from None
                 last_err = e
                 msg = str(e)
-                if any(x in msg for x in ("401", "403")):
-                    raise
+                if any(x in msg for x in ("401", "402", "403")):
+                    raise public_error(e) from None
                 if "429" in msg:
                     rate_tries += 1
                     if rate_tries > 2:
-                        raise
+                        raise public_error(e) from None
                     time.sleep(min(8, 1.5 * rate_tries))
                     continue
                 if not any(x in msg for x in ("400", "422", "415")):
-                    raise
+                    raise public_error(e) from None
                 continue
-    raise last_err or RuntimeError("模型调用失败")
+    raise public_error(last_err or RuntimeError("模型调用失败")) from None
 
 
 def _loads_json(text):
@@ -3410,8 +3426,8 @@ def build_export():
 def apply_import(payload):
     require_object(payload, "备份")
     # Validate the entire backup before creating a snapshot or touching live rows.
-    if payload.get("app") not in (APP_NAME, "FitAI"):
-        raise ApiError("不是带 渐渐飞 标识的备份；旧备份请先确认格式和能量单位", field="app")
+    if payload.get("app") not in (APP_NAME, *LEGACY_APP_NAMES):
+        raise ApiError("不是带 简减肥 标识的备份；旧备份请先确认格式和能量单位", field="app")
     ver = payload.get("schema_version")
     if not isinstance(ver, int) or isinstance(ver, bool):
         raise ApiError("无法识别的备份版本", field="schema_version")
@@ -3694,6 +3710,8 @@ class Handler(BaseHTTPRequestHandler):
         if method != "POST":
             raise ApiError("接口不存在", 404)
         if path == "/api/auth/logout":
+            # Consume the POST body before reusing an HTTP/1.1 connection.
+            self._json_body()
             if user:
                 if not secrets.compare_digest(self.headers.get("X-FitAI-Token", ""), user["csrf"]):
                     raise ApiError("会话校验失败", 403)
@@ -5513,13 +5531,13 @@ def _run_exercise_job(jid, text, etype, minutes, date, force_local=False):
 
 
 def _probe_port(p, timeout=1.5):
-    """只有真正的 渐渐飞 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
+    """只有真正的 简减肥 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
     url = "http://127.0.0.1:%d/api/health" % p
     try:
         resp = urllib.request.urlopen(url, timeout=timeout)
         raw = resp.read().decode("utf-8", "ignore")
         obj = json.loads(raw)
-        return bool(obj.get("ok") and obj.get("app") in (APP_NAME, "FitAI"))
+        return bool(obj.get("ok") and obj.get("app") in (APP_NAME, *LEGACY_APP_NAMES))
     except Exception:
         return False
 
@@ -5533,7 +5551,7 @@ def main():
     for p in range(PORT, PORT + 12):
         if _probe_port(p):
             url = "http://127.0.0.1:%d" % p
-            print("渐渐飞 已在运行：%s（未重复启动）" % url)
+            print("简减肥 已在运行：%s（未重复启动）" % url)
             if "--no-browser" not in sys.argv:
                 webbrowser.open(url)
             return
@@ -5553,7 +5571,7 @@ def main():
         sys.exit(1)
     url = "http://127.0.0.1:%d" % bound
     print("=" * 52)
-    print("  渐渐飞 减肥助手已启动")
+    print("  简减肥 减肥助手已启动")
     print("  地址：%s" % url)
     print("  数据：%s" % DB_PATH)
     print("  关闭窗口即停止服务")

@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <title>渐渐飞：由重到轻，向上飞的彗星</title>
-  <rect width="64" height="64" rx="20" fill="#D96643"/>
-  <path transform="rotate(180 32 32)" d="M11 52C22 43 23 32 29 22C33 15 40 12 46 16C53 20 54 29 48 35C42 41 33 39 25 44C19 48 15 51 11 52Z" fill="#FFF7E8"/>
+  <title>简减肥 · 双 J 品牌标记</title>
+  <rect width="64" height="64" rx="19" fill="#252D29"/>
+  <path d="M28 18V35C28 42.333 18 42.333 18 35" stroke="#F8F5ED" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M45 18V36C45 46 35 50 29 44" stroke="#E6A181" stroke-width="5.5" stroke-linecap="round"/>
 </svg>

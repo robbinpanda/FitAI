@@ -4,7 +4,8 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const TODAY = new Date().toLocaleDateString('sv-SE');
 const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null, recordingIntent: '' };
-const pageMeta = { chat: ['私人减脂助手', '和 渐渐飞 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
+const pageMeta = { chat: ['私人减脂助手', '和简减肥聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'], account: ['MY SPACE', '个人中心'] };
+let accountReturnPage = 'chat';
 const undoRecords = [];
 
 function esc(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -119,9 +120,25 @@ function goPage(page) {
   $$('.page').forEach(el => el.classList.toggle('active', el.id === `page-${page}`));
   $$('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   $('#pageEyebrow').textContent = pageMeta[page][0]; $('#pageTitle').textContent = pageMeta[page][1];
-  $('#sidebar').classList.remove('open');
+  closeSidebar();
+  $('#accountBtn').setAttribute('aria-current', page === 'account' ? 'page' : 'false');
+  $('.date-control').hidden = page === 'account';
+  $('#unitBtn').hidden = page === 'account';
   if (page === 'today') renderToday();
   if (page === 'trend') renderTrend();
+}
+
+function closeSidebar() {
+  $('#sidebar').classList.remove('open');
+  $('#menuBackdrop').hidden = true;
+  $('#menuBtn').setAttribute('aria-expanded', 'false');
+}
+
+function renderAccount() {
+  const p = S.state?.today?.profile || {};
+  $('#accountUsername').textContent = S.username || '我的账号';
+  $('#accountTarget').textContent = p.target_weight ? `${round(p.target_weight, 1)} kg` : '待设置';
+  $('#accountWeekly').textContent = Number(p.weekly_loss) > 0 ? `减 ${p.weekly_loss} kg` : '保持体重';
 }
 
 async function setDate(value) {
@@ -143,7 +160,7 @@ async function loadState() {
     const p = state.today?.profile || {};
     $('#profileTitle').textContent = p.target_weight ? `目标 ${round(p.target_weight, 1)} kg` : '个人档案';
     $('#profileSub').textContent = state.settings?.has_key ? `AI · ${state.settings.text_model}` : '点击配置 AI 模型';
-    renderToday(); renderTrend();
+    renderToday(); renderTrend(); renderAccount();
   } catch (e) { toast(e.message); }
 }
 
@@ -152,7 +169,7 @@ function renderToday() {
   const t = S.state?.today; if (!t) return;
   const u = unit(); const has = !!t.has_meals; const intake = has ? energy(t.intake) : null; const target = energy(t.target_intake);
   $('#intakeUnit').textContent = u; $('#intakeValue').textContent = intake ?? '—'; $('#mealStatusBadge').textContent = statusText(t.meal_status);
-  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 渐渐飞 你吃了什么。';
+  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉简减肥 你吃了什么。';
   $('#energyCaption').textContent = has ? `今日目标约 ${target} ${u}` : '记录饮食后显示目标进度';
   $('#targetValue').textContent = `目标 ${target ?? '—'} ${u}`;
   const pct = has && t.target_intake ? Math.min(115, num(t.intake) / num(t.target_intake) * 100) : 0;
@@ -302,7 +319,7 @@ function searchSources(data) {
 }
 function renderMessages() {
   $('#welcome').hidden = S.messages.length > 0;
-  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar"><img src="/logo.svg" alt="渐渐飞" width="29" height="29"></span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
+  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar"><img src="/logo.svg?v=jianjianfei-2" alt="简减肥" width="29" height="29"></span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
   const streaming = S.messages.find(m => m.streaming);
   if (streaming) {
     const text = $('#messages .message:last-child .message-text');
@@ -490,7 +507,7 @@ function selectRecordingIntent(intent) {
   const hints = {meal:'饮食记录：告诉我吃了什么和大致份量，也可以上传照片',exercise:'运动记录：告诉我做了什么、多久和大致强度',weight:'体重记录：输入本次称重数值'};
   $('#recordingIntent').hidden = !S.recordingIntent;
   $('#recordingIntentText').textContent = hints[S.recordingIntent] || '';
-  $('#chatInput').placeholder = hints[S.recordingIntent] || '告诉我你吃了什么、做了什么，或问任何减脂问题…';
+  $('#chatInput').placeholder = hints[S.recordingIntent] || '今天想记录什么？';
 }
 function handleChatShortcut(button) {
   if (S.busy) { toast('请等当前回复完成后再切换'); return; }
@@ -514,17 +531,55 @@ function fileToDataUrl(file) { return new Promise((resolve,reject) => { const r=
 function renderImages() { const box=$('#imageStrip'); box.hidden=!S.images.length; box.innerHTML=S.images.map((x,i)=>`<div class="image-thumb"><img src="${x.url}" alt="${esc(x.name)}"><button data-remove-image="${i}">×</button></div>`).join(''); }
 
 function openSettings(tab = 'profile') {
+  if (!S.state) { toast('资料正在加载，请稍后再试'); return; }
+  const entering = S.page !== 'account';
+  if (entering) accountReturnPage = S.page;
   const s=S.state?.settings||{}, p=S.state?.today?.profile||{};
   $('#profileGender').value=p.gender||'male'; $('#profileAge').value=p.age||''; $('#profileHeight').value=p.height||''; $('#profileStart').value=p.start_weight||S.state?.today?.weight||''; $('#profileTarget').value=p.target_weight||''; $('#profileWeekly').value=String(p.weekly_loss ?? .5); $('#profileActivity').value=String(p.activity||1.2);
   $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.key_source==='shared'?'正在使用站点默认 API；填写可改用自己的':s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent='';
   $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.tavily_key_source==='shared'?'正在使用站点默认搜索 API':s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
-  selectSettingsTab(tab); openMask('settingsMask');
+  renderAccount(); goPage('account'); selectSettingsTab(tab);
+  if (entering) $('#page-account').scrollTop = 0;
 }
-function selectSettingsTab(tab) { $$('.settings-tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab)); $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab)); }
+function selectSettingsTab(tab) {
+  const descriptions = {
+    profile: ['个人信息', '完善基本资料，让建议更适合你。'],
+    plan: ['减肥计划', '设定目标与节奏，按自己的步调来。'],
+    model: ['AI 服务', '查看当前连接，也可以使用自己的模型。'],
+    search: ['联网搜索', '按需查找资料，来源清楚可见。'],
+    data: ['数据与隐私', '管理属于你的记录与备份。'],
+    security: ['账号与登录', '管理当前登录，或切换到其他账号。'],
+  };
+  $$('.settings-tabs button').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false');});
+  $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab));
+  $('#settingsTitle').textContent=descriptions[tab][0];
+  $('#settingsDescription').textContent=descriptions[tab][1];
+  $('#accountSavebar').hidden=['data','security'].includes(tab);
+  $('#accountFeedback').textContent='';
+}
 async function saveSettings() {
-  const btn=$('#saveSettingsBtn'); btn.disabled=true;
-  try { if ($('.settings-tabs button.active')?.dataset.tab === 'profile') await api.post('/api/profile',{gender:$('#profileGender').value,age:num($('#profileAge').value),height:num($('#profileHeight').value),start_weight:$('#profileStart').value ? num($('#profileStart').value) : null,target_weight:num($('#profileTarget').value),weekly_loss:num($('#profileWeekly').value),activity:num($('#profileActivity').value),completed:true}); const key=$('#modelKey').value.trim(), searchKey=$('#tavilyKey').value.trim(); await api.post('/api/settings',{base_url:$('#modelBase').value.trim(),text_model:$('#modelName').value.trim(),api_key:key,api_key_action:key?'replace':'keep',vision_enabled:$('#visionEnabled').checked,vision_api_key_action:'keep',tavily_api_key:searchKey,tavily_api_key_action:searchKey?'replace':'keep',search_enabled:$('#searchEnabled').checked}); $('#modelKey').value=''; $('#tavilyKey').value=''; await loadState(); closeMask('settingsMask'); toast('设置已保存'); }
-  catch(e){toast(e.message)} finally{btn.disabled=false}
+  const tab=$('.settings-tabs button.active')?.dataset.tab;
+  if (!['profile','plan','model','search'].includes(tab)) return;
+  const invalid=$$('.settings-pane.active input,.settings-pane.active select').find(el=>!el.checkValidity());
+  if(invalid){invalid.reportValidity();return;}
+  const btn=$('#saveSettingsBtn'); btn.disabled=true; btn.textContent='正在保存…';
+  $('#accountFeedback').textContent='';
+  try {
+    if (tab==='profile'||tab==='plan') {
+      await api.post('/api/profile',{gender:$('#profileGender').value,age:num($('#profileAge').value),height:num($('#profileHeight').value),start_weight:$('#profileStart').value ? num($('#profileStart').value) : null,target_weight:num($('#profileTarget').value),weekly_loss:num($('#profileWeekly').value),activity:num($('#profileActivity').value),completed:true});
+    } else if (tab==='model') {
+      const key=$('#modelKey').value.trim();
+      await api.post('/api/settings',{base_url:$('#modelBase').value.trim(),text_model:$('#modelName').value.trim(),api_key:key,api_key_action:key?'replace':'keep',vision_enabled:$('#visionEnabled').checked,vision_api_key_action:'keep'});
+      $('#modelKey').value='';
+    } else {
+      const searchKey=$('#tavilyKey').value.trim();
+      await api.post('/api/settings',{tavily_api_key:searchKey,tavily_api_key_action:searchKey?'replace':'keep',search_enabled:$('#searchEnabled').checked});
+      $('#tavilyKey').value='';
+    }
+    await loadState(); openSettings(tab);
+    $('#accountFeedback').textContent='修改已保存。'; toast('修改已保存');
+  } catch(e){$('#accountFeedback').textContent=e.message;toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='保存修改'}
 }
 async function testModel(){const el=$('#testModelStatus');el.textContent='正在测试…';try{const key=$('#modelKey').value.trim();const r=await api.post('/api/test_key',{base_url:$('#modelBase').value.trim(),model:$('#modelName').value.trim(),api_key:key});el.textContent=`连接成功 · ${r.model}`}catch(e){el.textContent=e.message}}
 async function testSearch(){const el=$('#testSearchStatus'),btn=$('#testSearchBtn');btn.disabled=true;el.textContent='正在连接 Tavily…';try{const r=await api.post('/api/test_search',{tavily_api_key:$('#tavilyKey').value.trim()});el.textContent=`${r.message} · ${r.result_count} 条来源`}catch(e){el.textContent=e.message}finally{btn.disabled=false}}
@@ -535,7 +590,7 @@ async function clearOwnKey(kind){
 }
 async function clearSearchKey(){return clearOwnKey('search')}
 
-async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`渐渐飞-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
+async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`简减肥-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
@@ -555,8 +610,14 @@ function bind() {
   $('#messageScroll').addEventListener('scroll',()=>{followChat=chatAtBottom();$('#jumpLatest').hidden=followChat;},{passive:true});
   $('#setupModelBtn').onclick=()=>openSettings('model');
 
-  $$('[data-page]').forEach(x=>x.addEventListener('click',()=>goPage(x.dataset.page)));
-  $('#menuBtn').onclick=()=>$('#sidebar').classList.toggle('open'); $('#settingsBtn').onclick=()=>openSettings(); $('#settingsTopBtn').onclick=()=>openSettings(); $('#newChatBtn').onclick=createSession;
+  $$('[data-page]').forEach(x=>x.addEventListener('click',()=>x.dataset.page==='account'?openSettings():goPage(x.dataset.page)));
+  $('#menuBtn').onclick=()=>{const open=$('#sidebar').classList.toggle('open');$('#menuBackdrop').hidden=!open;$('#menuBtn').setAttribute('aria-expanded',String(open));};
+  $('#menuBackdrop').onclick=closeSidebar;
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSidebar()});
+  $('#settingsBtn').onclick=()=>openSettings(); $('#newChatBtn').onclick=createSession;
+  $('#accountBack').onclick=()=>goPage(accountReturnPage);
+  $('#cancelSettingsBtn').onclick=()=>openSettings($('.settings-tabs button.active')?.dataset.tab||'profile');
+  $('#logoutEntry').onclick=()=>openMask('accountMask');
   $('#prevDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()-1);setDate(isoDate(d))}; $('#nextDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()+1);setDate(isoDate(d))}; $('#dateButton').onclick=()=>{const el=$('#dateInput'); if(el.showPicker)el.showPicker();else el.click()}; $('#dateInput').onchange=e=>setDate(e.target.value);
   $('#unitBtn').onclick=async()=>{const next=unit()==='kcal'?'kJ':'kcal';try{await api.post('/api/prefs',{display_unit:next});S.state.display_unit=next;$('#unitLabel').textContent=next;renderToday();renderTrend()}catch(e){toast(e.message)}};
   $('#cancelRecordingIntent').onclick=()=>selectRecordingIntent('');
@@ -566,7 +627,7 @@ function bind() {
   document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt],[data-record-intent],[data-chat-entry]');if(p)handleChatShortcut(p); const s=e.target.closest('[data-session]');if(s){if(S.busy){toast('请先停止生成，再切换对话');return;}followChat=true;selectRecordingIntent('');S.sessionId=s.dataset.session;renderSessions();loadMessages();goPage('chat')} const rem=e.target.closest('[data-remove-image]');if(rem){S.images.splice(Number(rem.dataset.removeImage),1);renderImages()} const open=e.target.closest('[data-tool-open]');if(open)openTool(open.dataset.message,open.dataset.toolOpen);const rej=e.target.closest('[data-tool-reject]');if(rej){const m=S.messages.find(x=>x.id===Number(rej.dataset.message));const c=m?.tool_calls?.find(x=>x.id===rej.dataset.toolReject);if(c)decideTool('reject',{messageId:Number(rej.dataset.message),call:c})} const close=e.target.closest('[data-close]');if(close)closeMask(close.dataset.close)});
   $('#confirmToolBtn').onclick=()=>decideTool('confirm'); $('#rejectToolBtn').onclick=()=>decideTool('reject');
   $$('.modal-mask').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)closeMask(m.id)})); document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal-mask:not([hidden])').forEach(m=>closeMask(m.id));if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!e.ctrlKey&&!e.metaKey&&['1','2','3'].includes(e.key))goPage(['chat','today','trend'][Number(e.key)-1])});
-  $$('.settings-tabs button').forEach(x=>x.onclick=()=>selectSettingsTab(x.dataset.tab)); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#clearModelKeyBtn').onclick=()=>clearOwnKey('model'); $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
+  $$('.settings-tabs button').forEach(x=>x.onclick=()=>{selectSettingsTab(x.dataset.tab);if(matchMedia('(max-width:700px)').matches){document.querySelector('#settingsTitle').scrollIntoView({block:'start'});document.querySelector('#settingsTitle').focus({preventScroll:true})}}); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#clearModelKeyBtn').onclick=()=>clearOwnKey('model'); $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
   $('#testSearchBtn').onclick=testSearch; $('#clearSearchKeyBtn').onclick=clearSearchKey; $('#searchToggle').onchange=toggleSearch;
   $('#todayLogs').addEventListener('click',e=>{const btn=e.target.closest('[data-edit-id]');if(btn)openRecord(btn.dataset.editKind,btn.dataset.editId)});
   $('#toolEditor').addEventListener('input',handleEditorInput);
@@ -581,8 +642,8 @@ async function init(){
     if (!auth.user) { location.replace('/auth.html'); return; }
     S.token = auth.session_token;
     const account = $('#accountBtn');
-    account.textContent = auth.user.username + ' · 切换';
-    account.addEventListener('click', () => openMask('accountMask'));
+    S.username = auth.user.username;
+    account.addEventListener('click', () => openSettings());
     $('#logoutConfirm').addEventListener('click', async () => {
       try {
         if (streamController) streamController.abort();

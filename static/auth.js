@@ -2,7 +2,10 @@
 let registering = false, mode = 'local', registrationOpen = false;
 const el = id => document.getElementById(id);
 function updateForm() {
-  el('authTitle').textContent = registering ? '创建你的账号' : '欢迎回来';
+  el('authTitle').textContent = registering ? '从今天，开始。' : '欢迎回来。';
+  el('authDescription').textContent = registering ? '创建账号，给每一点改变留个记录。' : '登录简减肥，接着记录你的每一天。';
+  document.title = (registering ? '注册' : '登录') + ' · 简减肥';
+  el('usernameHint').hidden = !registering;
   el('submitAuth').textContent = registering ? '注册并登录' : '登录';
   el('toggleAuth').textContent = registering ? '已有账号？登录' : '没有账号？注册';
   el('confirmField').hidden = !registering;
@@ -13,12 +16,21 @@ function updateForm() {
   el('authError').textContent = '';
 }
 el('toggleAuth').addEventListener('click', () => { registering = !registering; updateForm(); });
+el('showPassword').addEventListener('click', () => {
+  const show = el('password').type === 'password';
+  el('password').type = show ? 'text' : 'password';
+  el('showPassword').textContent = show ? '隐藏' : '显示';
+  el('showPassword').setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+  el('showPassword').setAttribute('aria-pressed', String(show));
+});
 el('authForm').addEventListener('submit', async event => {
   event.preventDefault();
   if (registering && el('password').value !== el('confirmPassword').value) {
     el('authError').textContent = '两次输入的密码不一致'; return;
   }
   el('submitAuth').disabled = el('toggleAuth').disabled = true;
+  el('submitAuth').textContent = registering ? '正在创建账号…' : '正在登录…';
+  el('authForm').setAttribute('aria-busy', 'true');
   el('authError').textContent = '';
   try {
     const res = await fetch('/api/auth/' + (registering ? 'register' : 'login'), {
@@ -32,7 +44,11 @@ el('authForm').addEventListener('submit', async event => {
     }
     location.replace('/index.html');
   } catch(error) { el('authError').textContent = error.message; }
-  finally { el('submitAuth').disabled = false; el('toggleAuth').disabled = !registrationOpen; }
+  finally {
+    el('submitAuth').disabled = false; el('toggleAuth').disabled = !registrationOpen;
+    el('submitAuth').textContent = registering ? '注册并登录' : '登录';
+    el('authForm').removeAttribute('aria-busy');
+  }
 });
 async function bootAuth() {
   try {
@@ -43,7 +59,7 @@ async function bootAuth() {
     mode = state.mode; registrationOpen = state.registration_open;
     registering = registrationOpen && new URLSearchParams(location.search).get('mode') === 'register';
     updateForm();
-    el('modeHint').textContent = mode === 'server' ? '服务器版 · 邀请注册' : '本地版 · 无需邀请码';
+    el('modeHint').textContent = mode === 'server' ? '你的专属记录空间 · 邀请制' : '你的专属记录空间 · 本地版';
     el('registrationHint').textContent = registrationOpen ? (mode === 'server' ? '注册需要管理员提供的邀请码，名额有限。' : '记录保存在这台电脑，每个账号独立存储。') : '当前注册未开放，请联系管理员。';
     el('submitAuth').disabled = false; el('toggleAuth').disabled = !registrationOpen;
   } catch(error) { el('authError').textContent = error.message + '；请刷新重试。'; }

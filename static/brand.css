@@ -1,1 +1,2 @@
 .logo-mark,.brand-mark,.agent-orb,.message-avatar{background:transparent;padding:0;box-shadow:none}.logo-mark img,.brand-mark img,.agent-orb>.brand-icon,.message-avatar img{display:block;width:100%;height:100%;object-fit:contain}.agent-orb>.brand-icon{border-radius:inherit}.logo-mark{border-radius:0}.agent-orb i{display:none}.message-avatar{border-radius:0}.brand-icon{flex-shrink:0}
+.brand strong{letter-spacing:2px;font-weight:650}

@@ -232,7 +232,7 @@ class HttpTests(unittest.TestCase):
     def test_health(self):
         h = self.get("/api/health")
         self.assertTrue(h["ok"])
-        self.assertEqual(h["app"], "渐渐飞")
+        self.assertEqual(h["app"], "简减肥")
 
     def test_coach_sessions_and_image_roundtrip(self):
         d = server.date.today().isoformat()

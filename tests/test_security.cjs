@@ -47,3 +47,34 @@ test('removing personal model and search keys uses clear and refreshes default s
   assert.equal(c.run('JSON.stringify(tabs)'),JSON.stringify(['model','search']));
   assert.equal(c.run("messages.every(x=>x.includes('默认'))"),true);
 });
+
+test('saving a weight plan does not overwrite model or search settings',async()=>{
+  const c=client();
+  c.run(`var calls=[];
+    document.querySelectorAll=()=>[];
+    api.post=async(path,body)=>calls.push({path,body});
+    loadState=async()=>{}; openSettings=()=>{}; toast=()=>{};
+    $('.settings-tabs button.active').dataset={tab:'plan'};
+    $('#profileGender').value='female'; $('#profileAge').value='30';
+    $('#profileHeight').value='165'; $('#profileStart').value='70';
+    $('#profileTarget').value='64.5'; $('#profileWeekly').value='0.25';
+    $('#profileActivity').value='1.35';`);
+  await c.run('saveSettings()');
+  assert.equal(c.run('calls.length'),1);
+  assert.equal(c.run('calls[0].path'),'/api/profile');
+  assert.equal(c.run('calls[0].body.target_weight'),64.5);
+  assert.equal(c.run('calls[0].body.weekly_loss'),0.25);
+  assert.equal(c.elements['#accountFeedback'].textContent,'修改已保存。');
+  assert.equal(c.elements['#saveSettingsBtn'].disabled,false);
+});
+
+test('failed plan save keeps the form editable and reports the error',async()=>{
+  const c=client();
+  c.run(`document.querySelectorAll=()=>[]; api.post=async()=>{throw new Error('连接失败')}; toast=()=>{};
+    $('.settings-tabs button.active').dataset={tab:'plan'};
+    $('#profileTarget').value='64.5';`);
+  await c.run('saveSettings()');
+  assert.equal(c.elements['#profileTarget'].value,'64.5');
+  assert.equal(c.elements['#accountFeedback'].textContent,'连接失败');
+  assert.equal(c.elements['#saveSettingsBtn'].disabled,false);
+});

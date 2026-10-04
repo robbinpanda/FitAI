@@ -1,53 +1,68 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="渐渐飞：拍照估算营养，记录饮食、运动和体重。">
-<title>减减肥，渐渐飞。</title>
-<link rel="stylesheet" href="/landing.css"><link rel="icon" type="image/svg+xml" href="/logo.svg"><link rel="stylesheet" href="/brand.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="简减肥，你的日常减脂助手。拍照估算营养，像聊天一样记录饮食、运动与体重，让每一点改变都有迹可循。">
+<meta name="theme-color" content="#fafaf9"><title>简减肥 · 好好生活，慢慢轻盈。</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg?v=jianjianfei-2">
+<link rel="stylesheet" href="/public.css?v=jianjianfei-2"><link rel="stylesheet" href="/landing.css?v=20261004">
 </head>
-<body>
+<body class="public-page landing-page">
 <a class="skip" href="#main">跳到主要内容</a>
-<header class="header wrap">
-<a class="logo" href="/" aria-label="渐渐飞首页"><span class="logo-mark"><img src="/logo.svg" alt="" width="40" height="40"></span><b>渐渐飞</b></a>
-<nav class="nav" aria-label="主导航"><a href="#photo-demo">拍照记录</a><a href="#records">日常记录</a><a href="#trend">体重趋势</a></nav>
-<div class="account"><a id="loginLink" href="/auth.html">登录</a><a class="button small" id="registerLink" href="/auth.html?mode=register">注册</a></div>
-</header>
+<header class="site-header"><div class="header wrap">
+<a class="logo" href="/" aria-label="简减肥首页"><img src="/logo.svg?v=jianjianfei-2" alt="" width="32" height="32"><b>简减肥</b></a>
+<nav class="nav" aria-label="主导航"><a href="#photo-demo">拍照记录</a><a href="#records">自然对话</a><a href="#trend">体重趋势</a></nav>
+<div class="account"><a id="loginLink" href="/auth.html">登录</a><a class="button small" id="registerLink" href="/auth.html?mode=register">开始体验</a></div>
+</div></header>
 <main id="main">
-<section class="hero wrap">
-<div class="hero-copy"><h1>减减肥，<br><span>渐渐飞。</span></h1><p>拍照估算营养，<br>随手记录饮食、运动和体重。</p><a class="button" href="/auth.html?mode=register" data-start>开始记录 <span aria-hidden="true">↗</span></a></div>
-<div class="hero-visual" aria-label="拍照估算营养示例">
-<div class="meal-scene"><span class="scene-tag">午餐示例</span><svg class="food-art" viewBox="0 0 500 400" role="img" aria-label="鸡胸肉、蔬菜和米饭的插画"><defs><radialGradient id="plate"><stop stop-color="#fffef9"/><stop offset=".8" stop-color="#faf7ec"/><stop offset="1" stop-color="#d8d7c7"/></radialGradient><linearGradient id="chicken" x2="1" y2="1"><stop stop-color="#e9af68"/><stop offset="1" stop-color="#bf713d"/></linearGradient><filter id="shadow"><feDropShadow dx="0" dy="14" stdDeviation="10" flood-color="#43482b" flood-opacity=".15"/></filter><pattern id="rice" width="16" height="13" patternUnits="userSpaceOnUse"><rect width="16" height="13" fill="#e5dbc2"/><ellipse cx="7" cy="6" rx="6" ry="3" fill="#fff7e4" transform="rotate(-30 7 6)"/></pattern></defs><ellipse cx="250" cy="204" rx="177" ry="160" fill="url(#plate)" filter="url(#shadow)"/><ellipse cx="250" cy="204" rx="148" ry="131" fill="#ecebdd"/><path d="M265 92C344 69 413 140 369 231C328 247 265 239 237 199Z" fill="url(#rice)"/><g fill="#6e8a40" stroke="#506c2d" stroke-width="2"><path d="M126 134Q169 80 210 127Q223 155 198 180Q142 188 126 134Z"/><path d="M103 183Q131 146 169 174Q192 201 168 233Q110 251 103 183Z"/><path d="M169 124Q211 103 238 135Q244 174 208 183Z"/><path d="M124 239Q162 211 200 241Q211 283 174 297Q119 287 124 239Z"/></g><g fill="#91a55a"><circle cx="144" cy="128" r="19"/><circle cx="170" cy="117" r="19"/><circle cx="188" cy="136" r="21"/><circle cx="131" cy="190" r="21"/><circle cx="157" cy="205" r="23"/><circle cx="157" cy="253" r="23"/></g><g transform="rotate(-28 250 246)" fill="url(#chicken)" stroke="#f2ce91" stroke-width="4"><rect x="181" y="186" width="132" height="27" rx="13"/><rect x="173" y="217" width="149" height="29" rx="13"/><rect x="177" y="250" width="145" height="29" rx="13"/><rect x="190" y="283" width="117" height="25" rx="12"/></g><g fill="#c95635" stroke="#f19064" stroke-width="4"><circle cx="327" cy="292" r="23"/><circle cx="358" cy="268" r="21"/></g><g fill="#efd797"><circle cx="321" cy="286" r="3"/><circle cx="334" cy="297" r="3"/><circle cx="352" cy="261" r="3"/><circle cx="362" cy="272" r="3"/></g><g fill="#556636"><circle cx="223" cy="230" r="2"/><circle cx="247" cy="252" r="2"/><circle cx="268" cy="218" r="2"/><circle cx="283" cy="264" r="2"/></g></svg></div>
-<div class="nutrition-result"><h2>鸡胸肉时蔬饭</h2><div class="nutrients">
-<div><strong>520<small> kcal</small></strong><span>热量</span></div>
-<div><strong>38<small> g</small></strong><span>蛋白质</span></div>
-<div><strong>56<small> g</small></strong><span>碳水</span></div>
-<div><strong>16<small> g</small></strong><span>脂肪</span></div>
-</div></div>
+<section class="hero">
+<div class="hero-copy wrap">
+<p class="eyebrow">JIANJIANFEI · 简减肥</p>
+<h1>好好生活。<br><span>慢慢轻盈。</span></h1>
+<p class="hero-lead">一张照片，一句日常。<br>让每一点改变，都有迹可循。</p>
+<div class="hero-actions"><a class="button" href="/auth.html?mode=register" data-start>开始你的记录 <span aria-hidden="true">↗</span></a><a class="text-link" href="#photo-demo">看看如何使用 <span aria-hidden="true">↓</span></a></div>
+</div>
+<div class="product-stage wrap">
+<div class="product-window" aria-label="简减肥餐食记录界面示例">
+<div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>简减肥 · 今天也在好好生活</span><span class="preview-label">产品示意</span></div>
+<div class="product-content">
+<div class="preview-photo"><img src="/salmon-pasta-demo.png" width="500" height="400" alt="三文鱼意面、番茄和菠菜的餐食示意" fetchpriority="high"><span>午餐时光 <b>12:30</b></span><small>AI 生成 · 餐食示意</small></div>
+<div class="preview-details">
+<div class="preview-agent"><img src="/logo.svg?v=jianjianfei-2" alt="" width="28" height="28"><span>简减肥 <small>帮你认真记下这一餐</small></span></div>
+<p class="preview-kicker">拍张照片，就有了答案。</p><h2>三文鱼时蔬意面</h2><p class="preview-description">好好享受这一餐，剩下的我来整理。</p>
+<div class="preview-energy"><strong>536</strong><span>kcal<br><small>本餐估算热量</small></span></div>
+<div class="preview-macros"><div><i></i><b>37 <small>g</small></b><span>蛋白质</span></div><div><i></i><b>52 <small>g</small></b><span>碳水化合物</span></div><div><i></i><b>20 <small>g</small></b><span>脂肪</span></div></div>
+<div class="preview-confirm"><span>✓ 核对份量后，由你确认保存</span><span aria-hidden="true">↗</span></div>
+</div>
+</div>
+</div>
+<p class="stage-caption">拍照估算 · 自然对话 · 趋势回看 <span>把减脂，变简单。</span></p>
 </div>
 </section>
+<div class="intro wrap"><p>不必把生活，过成一张表格。</p><h2>让记录变简单。<br><span>让坚持，更自然。</span></h2></div>
 <section class="photo-section wrap" id="photo-demo">
-<div class="demo-heading"><div><h2>一张照片，记清这一餐。</h2><p>AI 列出食物和营养估算，你调整份量，确认保存。</p></div><a class="photo-try" href="/auth.html?mode=register" data-start>用我的照片试试 ↗</a></div>
+<div class="demo-heading"><div><p class="eyebrow">拍照记录</p><h2>好好吃饭。<br><span>记录的事，交给 AI。</span></h2><p>拍下这一餐，食物与营养一目了然。<br>份量可以调整，记录由你确认。</p></div><a class="photo-try text-link" href="/auth.html?mode=register" data-start>用我的照片试试 ↗</a></div>
 <div class="photo-workflow">
-<div class="photo-input"><span class="step-label">1 / 上传照片</span><div class="uploaded-image"><img src="/salmon-pasta-demo.png" alt="餐食照片示意：三文鱼意面、番茄和菠菜" width="500" height="400"><span>AI 生成 · 餐食示意</span></div><p class="photo-message">帮我记下这份三文鱼意面。</p></div>
-<div class="food-output"><span class="step-label">2 / AI 整理食物清单</span><div class="assistant-heading"><img src="/logo.svg" alt="" width="32" height="32"><b>这餐有这些食物</b><span>估算示例</span></div>
+<div class="photo-input"><span class="step-label">1 / 上传照片</span><div class="uploaded-image"><img src="/salmon-pasta-demo.png" alt="餐食照片示意：三文鱼意面、番茄和菠菜" width="500" height="400" loading="lazy" decoding="async"><span>AI 生成 · 餐食示意</span></div><p class="photo-message">帮我记下这份三文鱼意面。</p></div>
+<div class="food-output"><span class="step-label">2 / AI 整理食物清单</span><div class="assistant-heading"><img src="/logo.svg?v=jianjianfei-2" alt="" width="32" height="32"><b>这餐有这些食物</b><span>估算示例</span></div>
 <table class="food-list"><thead><tr><th scope="col">食物</th><th scope="col">份量</th><th scope="col">热量</th></tr></thead><tbody><tr><th scope="row">三文鱼</th><td>120 g</td><td>230 kcal</td></tr><tr><th scope="row">意面</th><td><select id="demoPasta" aria-label="调整示例意面份量"><option value="100">100 g</option><option value="150" selected>150 g</option><option value="200">200 g</option></select></td><td id="pastaEnergy">221 kcal</td></tr><tr><th scope="row">番茄与菠菜</th><td>120 g</td><td>40 kcal</td></tr><tr><th scope="row">橄榄油</th><td>5 g</td><td>45 kcal</td></tr></tbody></table>
 <div class="demo-total" aria-live="polite"><div><span>本餐合计</span><strong id="foodTotal">536 <small>kcal</small></strong></div><p id="foodMacros">蛋白质 37 g · 碳水 52 g · 脂肪 20 g</p></div>
 <div class="demo-save"><div><span class="step-label">3 / 调整后确认</span><p id="foodDemoStatus" role="status">试着调整意面份量，看看营养变化。</p></div><button class="button" id="confirmFoodDemo" type="button">确认示例</button></div>
 </div></div>
 </section>
-<section class="record-section wrap" id="records">
-<div class="section-copy"><h2>说一句，就记下。</h2><p>饮食、运动都能记，还能估算热量。<br>确认后保存，随时可修改。</p></div>
-<div class="record-demo" aria-label="聊天记录流程示例"><p class="user-message">晚饭后快走了半小时。</p><div class="record-result"><img src="/logo.svg" alt="渐渐飞" width="34" height="34"><div class="exercise-summary"><div class="exercise-heading"><b>快走</b><span>30 分钟</span></div><div class="exercise-energy"><span>预计消耗</span><strong>约 150 <small>kcal</small></strong></div><p>估算示例 · 随体重与运动强度变化</p></div><span class="record-status">待确认</span></div></div>
-</section>
-<section class="trend-section wrap" id="trend">
-<div class="weight-story"><div class="section-copy"><h2>看见体重的变化。</h2><p>每天说一句体重，确认后记下。<br>回看趋势，看见每一点变化。</p></div><div class="weight-chat" aria-label="对话记录体重示例"><p class="user-message">今天体重 68.4 公斤。</p><div class="weight-reply"><img src="/logo.svg" alt="渐渐飞" width="32" height="32"><div><span>今日体重</span><strong>68.4 <small>kg</small></strong></div><span class="weight-pending">待确认</span></div><p class="weight-chat-note">对话示例 · 确认后保存到每日记录</p></div></div>
+<section class="record-band" id="records"><div class="record-section wrap">
+<div class="section-copy"><p class="eyebrow">自然对话</p><h2>少一点输入。<br><span>多一点生活。</span></h2><p>“晚饭后快走了半小时。”<br>像聊天一样，把饮食和运动记下来。<br>AI 帮你整理，你只需要确认。</p></div>
+<div class="record-demo" aria-label="聊天记录流程示例"><p class="user-message">晚饭后快走了半小时。</p><div class="record-result"><img src="/logo.svg?v=jianjianfei-2" alt="简减肥" width="34" height="34"><div class="exercise-summary"><div class="exercise-heading"><b>快走</b><span>30 分钟</span></div><div class="exercise-energy"><span>预计消耗</span><strong>约 150 <small>kcal</small></strong></div><p>估算示例 · 随体重与运动强度变化</p></div><span class="record-status">待确认</span></div></div>
+</div></section><section class="trend-section wrap" id="trend">
+<div class="weight-story"><div class="section-copy"><p class="eyebrow">长期趋势</p><h2>每一小步，<br><span>都看得见。</span></h2><p>不被一天的数字左右。<br>把目光放远一点，看见自己的变化。</p></div><div class="weight-chat" aria-label="对话记录体重示例"><p class="user-message">今天体重 68.4 公斤。</p><div class="weight-reply"><img src="/logo.svg?v=jianjianfei-2" alt="简减肥" width="32" height="32"><div><span>今日体重</span><strong>68.4 <small>kg</small></strong></div><span class="weight-pending">待确认</span></div><p class="weight-chat-note">对话示例 · 确认后保存到每日记录</p></div></div>
 <div class="trend-card"><div class="chart-heading"><span>体重趋势 <small>示例</small></span><div class="range" role="group" aria-label="示例趋势范围"><button type="button" class="active" aria-pressed="true" data-range="14">14 天</button><button type="button" aria-pressed="false" data-range="30">30 天</button></div></div>
 <div class="weight-summary"><div><strong id="demoWeight">68.4</strong><span>kg</span></div><p id="demoChange">较起点 −1.2 kg</p></div>
 <svg class="trend-chart" viewBox="0 0 560 235" role="img" aria-labelledby="chartTitle"><title id="chartTitle">14 天体重示例：从 69.6 kg 波动下降至 68.4 kg，不代表减重承诺</title><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d3dfd0" stop-opacity=".65"/><stop offset="1" stop-color="#d3dfd0" stop-opacity="0"/></linearGradient></defs><g class="grid"><path d="M42 32H540M42 86H540M42 140H540M42 194H540"/></g><g class="axis"><text x="0" y="36">70</text><text x="0" y="90">69</text><text x="0" y="144">68</text><text x="0" y="198">67</text><text x="42" y="226">第 1 天</text><text x="265" y="226" id="chartMid">第 7 天</text><text x="491" y="226" id="chartEnd">第 14 天</text></g><path id="chartArea" fill="url(#chartFill)" d="M45 54L84 69L122 61L160 87L198 80L236 97L274 87L312 114L350 106L388 119L426 110L464 122L502 111L536 118V194H45Z"/><path id="chartLine" d="M45 54L84 69L122 61L160 87L198 80L236 97L274 87L312 114L350 106L388 119L426 110L464 122L502 111L536 118" fill="none" stroke="#597552" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle id="chartDot" cx="536" cy="118" r="6" fill="#597552" stroke="white" stroke-width="3"/></svg>
 </div>
 </section>
+
+<section class="closing wrap"><img src="/logo.svg?v=jianjianfei-2" width="56" height="56" alt=""><p class="eyebrow">从一顿饭，一次散步开始</p><h2>把减脂，<span>变简单。</span></h2><p>不赶时间，按自己的节奏来。</p><a class="button" href="/auth.html?mode=register" data-start>开启你的第一条记录 <span aria-hidden="true">↗</span></a></section>
 </main>
-<footer class="footer wrap"><a class="logo" href="/"><span class="logo-mark"><img src="/logo.svg" alt="" width="40" height="40"></span><b>渐渐飞</b></a><p>营养为估算值，可修改。展示数据仅作示例。</p></footer>
-<script src="/landing.js"></script>
+<footer class="footer"><div class="wrap"><div class="footer-top"><a class="logo" href="/"><img src="/logo.svg?v=jianjianfei-2" alt="" width="30" height="30"><b>简减肥</b></a><a href="/auth.html" class="text-link">登录我的账号 ↗</a></div><p>展示中的餐食、记录与趋势均为示例，不代表实际使用结果或减重承诺。营养为估算值，请根据实际份量调整。</p><div class="footer-bottom"><span>© 2026 简减肥</span><span>好好生活，慢慢轻盈。</span></div></div></footer>
+<script src="/landing.js?v=20261004"></script>
 </body></html>
