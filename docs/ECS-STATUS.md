@@ -1,4 +1,24 @@
-# 北京 ECS 当前状态（2026-09-29）
+# 北京 ECS 当前状态（2026-10-16）
+
+## 当前域名入口
+
+正式入口为 **https://www.jianjianfei.top/**，**https://jianjianfei.top/** 以 308 跳转到 www，保留路径和查询参数。用户确认 ICP 备案已审核通过。已从 ECS、本机严格 TLS 请求和内置浏览器验证首页可访问，健康接口 200，匿名 `/api/state` 401。HTTP 和原公网 IP 的 HTTPS 均以 308 跳转到 www 域名。
+
+本次故障有三层：阿里云仅配置 `www` A 记录；Nginx 只接受 IP；应用 `FITAI_PUBLIC_ORIGIN` 及证书均为 IP。现已改为 `FITAI_PUBLIC_ORIGIN=https://www.jianjianfei.top`，关闭 SSH 预览，保留账号与请求来源校验。
+
+域名证书 SAN 为 `jianjianfei.top` 和 `www.jianjianfei.top`，有效期至 2027-01-14 UTC，证书名称仍为 `www.jianjianfei.top`；原 IP 证书保留用于跳转。HTTP ACME webroot `/var/lib/fitai-acme` 保留。实际启用链接仍为 `/etc/nginx/sites-enabled/fitai-ip`，对应配置已同步到 `deploy/www.jianjianfei.top.nginx.conf`；此文件是替换当前站点的完整配置，不能与旧模板同时启用（包含相同限流区和默认站点）。
+
+本机网络会返回代理合成的 198.18.* DNS 地址，不能据此判断公网解析错误。已从 ECS 查询阿里 DNS 与权威 DNS，确认 `www.jianjianfei.top` 和根域名均指向 `8.152.196.106`。用户补充 `@` 记录后，已扩展域名证书 SAN 并加入根域名 HTTPS 跳转站点；本机实测 `/auth.html?mode=register` 路径及参数完整保留，根域名跟随跳转首页最终 200。
+
+续期超时排查：相同服务器对正式和 staging ACME 的普通 requests、默认 ALPN、不带 ALPN、TLS 1.2、urllib 及 ACME ClientNetwork 探测均曾成功；对真实失败的追踪确认包括 TLS 握手超时和握手完成后的读取超时。此前判断为固定 ALPN 兼容问题证据不足，已移除临时 `certbot-compatible.py` 和对应 systemd override，保留标准 TLS 协商及证书/主机名校验。
+
+新的 `deploy/certbot-network.py` 为 ACME 客户端配置有界网络重试：最多重试 3 次，读取超时及 429/5xx 响应仅对 GET/HEAD 重试；签名 POST 不会因读取超时或 HTTP 错误响应被重放。`fitai-certbot.timer` 每天两次检查全部证书，定时器已有最多 1 小时随机延迟，Certbot 内部重复随机等待已取消。服务失败每隔 5 分钟重试，6 小时内最多启动 3 次，单次最长 20 分钟；成功续期执行 `nginx -t` 和 reload。
+
+验收：通过上述网络重试入口运行 `renew --dry-run --no-random-sleep-on-renew --run-deploy-hooks`，两张证书均显示成功（IP 与包含两个域名的证书），每张证书的部署 hook 均完成 Nginx 检查和重载。模拟续期没有替换正式证书。`systemd-analyze verify` 验证服务配置通过；正式 `systemctl start fitai-certbot.service` 返回 `Result=success`、`ExecMainStatus=0`，定时器启用并已安排下次运行。
+
+首次变更前 Nginx 与环境配置备份：`/var/backups/fitai/domain-20261016-061108/`，环境备份继承原文件 600 权限。根域名变更前站点、旧续期服务与临时协议补丁备份：`/var/backups/fitai/root-domain-20261016-062049/`。没有修改账号数据、邀请码、模型密钥或业务代码。
+
+## 2026-09-29 历史状态
 
 已按所有者要求启用公网 IP HTTPS 访问：**https://8.152.196.106/**。无需 SSH 隧道。阿里云安全组 80/443 已由用户放行，UFW 同步开放。`fitai` 仍只监听 `127.0.0.1:8765`，由 Nginx 对外提供 443；80 仅提供 ACME 验证及跳转 HTTPS。应用配置为 `FITAI_SSH_PREVIEW=0`、`FITAI_PUBLIC_ORIGIN=https://8.152.196.106`，原 localhost 隧道来源不再接受。
 

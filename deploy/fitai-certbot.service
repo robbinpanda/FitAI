@@ -1,8 +1,13 @@
 [Unit]
-Description=Renew 渐渐飞 IP HTTPS certificate
+Description=Renew JianJianFei HTTPS certificates
 After=network-online.target nginx.service
 Wants=network-online.target
+StartLimitIntervalSec=6h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
-ExecStart=/opt/fitai-certbot/bin/certbot renew --quiet --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"
+ExecStart=/opt/fitai-certbot/bin/python3 /opt/fitai/deploy/certbot-network.py renew --quiet --no-random-sleep-on-renew --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"
+Restart=on-failure
+RestartSec=5min
+TimeoutStartSec=20min
