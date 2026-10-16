@@ -56,14 +56,14 @@ class BackupValidationTests(unittest.TestCase):
 
     def test_rebrand_preserves_legacy_backup_records(self):
         source = server.build_export()
-        self.assertEqual(source["app"], "简减肥")
-        for name in ("简减肥", "渐渐飞", "FitAI"):
+        self.assertEqual(source["app"], "拍拍记")
+        for name in ("拍拍记", "简减肥", "渐渐飞", "FitAI"):
             with self.subTest(name=name):
                 legacy = copy.deepcopy(source)
                 legacy["app"] = name
                 server.apply_import(legacy)
                 restored = server.build_export()
-                self.assertEqual(restored["app"], "简减肥")
+                self.assertEqual(restored["app"], "拍拍记")
                 # Import assigns fresh SQLite row IDs; the recorded values must survive.
                 values = lambda rows: [{k: row[k] for k in ("date", "weight", "note")} for row in rows]
                 self.assertEqual(values(restored["weights"]), values(source["weights"]))

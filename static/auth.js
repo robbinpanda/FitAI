@@ -3,8 +3,8 @@ let registering = false, mode = 'local', registrationOpen = false;
 const el = id => document.getElementById(id);
 function updateForm() {
   el('authTitle').textContent = registering ? '从今天，开始。' : '欢迎回来。';
-  el('authDescription').textContent = registering ? '创建账号，给每一点改变留个记录。' : '登录简减肥，接着记录你的每一天。';
-  document.title = (registering ? '注册' : '登录') + ' · 简减肥';
+  el('authDescription').textContent = registering ? '创建账号，给每一点改变留个记录。' : '登录拍拍记，接着记录你的每一天。';
+  document.title = (registering ? '注册' : '登录') + ' · 拍拍记';
   el('usernameHint').hidden = !registering;
   el('submitAuth').textContent = registering ? '注册并登录' : '登录';
   el('toggleAuth').textContent = registering ? '已有账号？登录' : '没有账号？注册';

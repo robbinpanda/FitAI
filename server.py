@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-简减肥 - 个人减肥助手 · 本地服务端
+拍拍记 - 个人减肥助手 · 本地服务端
 零第三方依赖，仅使用 Python 标准库。
 数据全部存放在本机 data/fitai.db（SQLite），API Key 也只存在本机。
 启动：python server.py
@@ -46,8 +46,8 @@ JOB_TTL = 900
 JOB_MAX_RUNNING = 2
 JOB_MAX_OUTPUT = 180000
 JOB_HARD_TIMEOUT = MODEL_TIMEOUT + 90
-APP_NAME = "简减肥"
-LEGACY_APP_NAMES = ("渐渐飞", "FitAI")
+APP_NAME = "拍拍记"
+LEGACY_APP_NAMES = ("简减肥", "渐渐飞", "FitAI")
 APP_VERSION = "2.0"
 SCHEMA_VERSION = 5
 COACH_MAX_IMAGES = 4
@@ -1111,7 +1111,7 @@ AGENT_MANAGEMENT_TOOLS = ("update_meal", "update_exercise", "update_weight", "de
 AGENT_READ_TOOLS = ("query_records", "get_day_summary")
 AGENT_TOOLS = ("log_meal", "log_exercise", "log_weight") + AGENT_MANAGEMENT_TOOLS
 
-AGENT_SYSTEM = """你是 简减肥，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
+AGENT_SYSTEM = """你是 拍拍记，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
 
 【工具调用是任务的一部分】
 不要把工具调用当成可选的补充。每轮先判断用户是在要求执行记录/管理/查询，还是只想咨询；一旦命中下述触发条件，必须在本轮 tool_calls 中返回匹配工具，不能只用 reply 口头答应、复述参数、建议用户手动操作，或让用户再次提醒你调用工具。
@@ -3537,7 +3537,7 @@ def apply_import(payload):
     require_object(payload, "备份")
     # Validate the entire backup before creating a snapshot or touching live rows.
     if payload.get("app") not in (APP_NAME, *LEGACY_APP_NAMES):
-        raise ApiError("不是带 简减肥 标识的备份；旧备份请先确认格式和能量单位", field="app")
+        raise ApiError("不是带 拍拍记 标识的备份；旧备份请先确认格式和能量单位", field="app")
     ver = payload.get("schema_version")
     if not isinstance(ver, int) or isinstance(ver, bool):
         raise ApiError("无法识别的备份版本", field="schema_version")
@@ -5713,7 +5713,7 @@ def _run_exercise_job(jid, text, etype, minutes, date, force_local=False):
 
 
 def _probe_port(p, timeout=1.5):
-    """只有真正的 简减肥 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
+    """只有真正的 拍拍记 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
     url = "http://127.0.0.1:%d/api/health" % p
     try:
         resp = urllib.request.urlopen(url, timeout=timeout)
@@ -5733,7 +5733,7 @@ def main():
     for p in range(PORT, PORT + 12):
         if _probe_port(p):
             url = "http://127.0.0.1:%d" % p
-            print("简减肥 已在运行：%s（未重复启动）" % url)
+            print("拍拍记 已在运行：%s（未重复启动）" % url)
             if "--no-browser" not in sys.argv:
                 webbrowser.open(url)
             return
@@ -5753,7 +5753,7 @@ def main():
         sys.exit(1)
     url = "http://127.0.0.1:%d" % bound
     print("=" * 52)
-    print("  简减肥 减肥助手已启动")
+    print("  拍拍记 减肥助手已启动")
     print("  地址：%s" % url)
     print("  数据：%s" % DB_PATH)
     print("  关闭窗口即停止服务")

@@ -1,6 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <title>简减肥 · 双 J 品牌标记</title>
-  <rect width="64" height="64" rx="19" fill="#252D29"/>
-  <path d="M28 18V35C28 42.333 18 42.333 18 35" stroke="#F8F5ED" stroke-width="5.5" stroke-linecap="round"/>
-  <path d="M45 18V36C45 46 35 50 29 44" stroke="#E6A181" stroke-width="5.5" stroke-linecap="round"/>
+  <title>拍拍记 · 取景框里的一餐</title>
+  <rect width="64" height="64" rx="16" fill="#252D29"/>
+  <path d="M13 23V15.5A2.5 2.5 0 0 1 15.5 13H23M41 13H48.5A2.5 2.5 0 0 1 51 15.5V23M51 41V48.5A2.5 2.5 0 0 1 48.5 51H41M23 51H15.5A2.5 2.5 0 0 1 13 48.5V41" stroke="#E6A181" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="13.5" fill="#F8F5ED"/>
+  <circle cx="32" cy="32" r="9.5" stroke="#D8CEC2" stroke-width="1.5"/>
+  <path d="M24.5 35.5C24.5 29.5 29 25.5 35 25.5C35 31.5 30.5 35.5 24.5 35.5Z" fill="#6E9A5B"/>
+  <path d="M25.5 34.5L32 28" stroke="#F8F5ED" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="36" cy="35.5" r="4" fill="#E0663F"/>
+  <circle cx="34.8" cy="34.2" r="1.1" fill="#F6B49C"/>
 </svg>
