@@ -11,6 +11,9 @@ function updateForm() {
   el('confirmField').hidden = !registering;
   el('confirmPassword').required = registering;
   el('password').autocomplete = registering ? 'new-password' : 'current-password';
+  el('password').minLength = registering ? 8 : 1;
+  el('password').placeholder = registering ? '至少 8 位，包含英文字母和数字' : '输入你的密码';
+  el('passwordHint').hidden = !registering;
   el('inviteField').hidden = !registering || mode !== 'server';
   el('invite').required = registering && mode === 'server';
   el('authError').textContent = '';
@@ -25,6 +28,10 @@ el('showPassword').addEventListener('click', () => {
 });
 el('authForm').addEventListener('submit', async event => {
   event.preventDefault();
+  const password = el('password').value;
+  if (registering && ([...password].length < 8 || [...password].length > 128 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password))) {
+    el('authError').textContent = '密码需为 8–128 个字符，且包含英文字母和数字'; return;
+  }
   if (registering && el('password').value !== el('confirmPassword').value) {
     el('authError').textContent = '两次输入的密码不一致'; return;
   }

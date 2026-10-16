@@ -47,12 +47,15 @@ def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def credentials(body):
+def credentials(body, *, new_password=True):
     name, password = body.get("username"), body.get("password")
     if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]{3,32}", name):
         raise SecurityError("用户名需为 3–32 位字母、数字、下划线或短横线")
-    if not isinstance(password, str) or not 12 <= len(password) <= 128:
-        raise SecurityError("密码需为 12–128 个字符")
+    if not isinstance(password, str) or not 1 <= len(password) <= 128:
+        raise SecurityError("密码需为 1–128 个字符")
+    if new_password and (len(password) < 8 or not re.search(r"[A-Za-z]", password)
+                         or not re.search(r"[0-9]", password)):
+        raise SecurityError("密码需为 8–128 个字符，且包含英文字母和数字")
     return name.lower(), password
 
 
@@ -176,7 +179,7 @@ class Accounts:
     def authenticate(self, body, register, ip):
         self.limit("auth-global", 60, 600)
         self.limit("auth-ip:" + ip, 12, 600)
-        name, password = credentials(body)
+        name, password = credentials(body, new_password=register)
         self.limit("auth-user:" + name, 15, 600)
         if register:
             self.limit("register-ip:" + ip, 5, 3600)

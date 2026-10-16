@@ -11,7 +11,7 @@
 ## 密码、邀请码和会话
 
 - 密码和邀请码使用随机盐 scrypt（N=16384、r=8、p=5，32 字节输出），不是可逆加密；参数参考 [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)。
-- 密码要求 12–128 字符，邀请码管理员通过终端隐藏输入，要求 16–128 字符。没有默认凭据、明文邀请码环境变量或网页管理接口。
+- 密码要求 8–128 字符，且包含英文字母和数字，邀请码管理员通过终端隐藏输入，要求 16–128 字符。没有默认凭据、明文邀请码环境变量或网页管理接口。
 - 邀请码剩余次数与新增用户在同一 SQLite 事务中提交；更换立即生效，可关闭注册，另有全站账号上限。
 - 登录成功生成随机会话，数据库仅存令牌 SHA-256 摘要；Cookie 使用 HttpOnly、SameSite=Strict，server 额外使用 Secure。12 小时绝对过期，最多保留 5 个设备会话。
 - 写入必须携带对应会话的独立 CSRF token，同时检查 Host / Origin / Sec-Fetch-Site；登录注册要求 JSON 与自定义请求头，不接受跨域请求。

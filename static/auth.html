@@ -33,7 +33,7 @@
       <div class="auth-heading"><img src="/logo.svg?v=snap-1" alt="" width="44" height="44"><p id="modeHint" class="eyebrow" role="status">正在连接…</p><h1 id="authTitle">欢迎回来。</h1><p id="authDescription">登录拍拍记，接着记录你的每一天。</p></div>
       <form id="authForm">
         <div class="auth-field"><label for="username">用户名</label><input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}" required placeholder="输入你的用户名" aria-describedby="usernameHint"><small id="usernameHint" hidden>3–32 位字母、数字、下划线或短横线</small></div>
-        <div class="auth-field"><label for="password">密码</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required placeholder="至少 12 个字符"><button id="showPassword" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div></div>
+        <div class="auth-field"><label for="password">密码</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" minlength="1" maxlength="128" required placeholder="输入你的密码" aria-describedby="passwordHint"><button id="showPassword" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div><small id="passwordHint" hidden>8–128 位，包含英文字母和数字</small></div>
         <div id="confirmField" class="auth-field" hidden><label for="confirmPassword">确认密码</label><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="再次输入密码"></div>
         <div id="inviteField" class="auth-field" hidden><label for="invite">邀请码</label><input id="invite" type="password" autocomplete="off" maxlength="128" placeholder="输入管理员提供的邀请码"></div>
         <p id="authError" role="alert"></p>
@@ -44,7 +44,7 @@
     </section>
   </main>
   <footer class="auth-footer wrap"><span>把减脂，变简单。</span><span>用小小的记录，陪伴每一天。</span><a class="beian" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">沪ICP备2026053161号</a></footer>
-  <script src="/auth.js?v=snap-1"></script>
+  <script src="/auth.js?v=password-8-1"></script>
   <script src="/pwa.js?v=4" defer></script>
 </body>
 </html>

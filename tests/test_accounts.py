@@ -27,7 +27,7 @@ class AccountTests(unittest.TestCase):
         with self.auth.connect() as c:
             c.execute("INSERT INTO config VALUES('invite_hash',?)", (security.password_hash(self.invite),))
             c.execute("INSERT INTO config VALUES('invite_remaining','5')")
-        self.password = "correct-test-password"
+        self.password = "correct-test-password-1"
 
     def tearDown(self):
         server.AUTH = self.old_auth
@@ -63,6 +63,29 @@ class AccountTests(unittest.TestCase):
         cookie = result["headers"]["Set-Cookie"].split(";", 1)[0]
         status = self.request("/api/auth/status", cookie=cookie)
         return cookie, status["body"]["session_token"]
+
+    def test_eight_character_password_registers_and_logs_in(self):
+        self.password = "abc12345"
+        self.register()
+        login = self.request("/api/auth/login", {"username": "alice", "password": self.password})
+        self.assertEqual(login["status"], 200, login)
+
+    def test_registration_rejects_passwords_without_required_mix(self):
+        for password in ["abc1234", "abcdefgh", "12345678", "中文密码1234", "a1" + "x" * 127]:
+            with self.subTest(password=password):
+                result = self.request("/api/auth/register", {
+                    "username": "alice", "password": password, "invite": self.invite})
+                self.assertEqual(result["status"], 400, result)
+        with self.auth.connect() as c:
+            self.assertEqual(c.execute("SELECT count(*) FROM users").fetchone()[0], 0)
+
+    def test_legacy_password_without_digits_still_logs_in(self):
+        self.register()
+        legacy = "correct-test-password"
+        with self.auth.connect() as c:
+            c.execute("UPDATE users SET password=? WHERE username='alice'", (security.password_hash(legacy),))
+        login = self.request("/api/auth/login", {"username": "alice", "password": legacy})
+        self.assertEqual(login["status"], 200, login)
 
     def test_shared_defaults_override_clear_and_isolation(self):
         defaults = {"FITAI_SHARED_API_KEY": "site-model-secret-1234",
@@ -312,7 +335,7 @@ class NetworkPolicyTests(unittest.TestCase):
             with self.assertRaises(security.SecurityError):
                 accounts.check_origin({"Host":"localhost:18765", "Origin":"http://evil.test"})
             with self.assertRaises(security.SecurityError):
-                accounts.authenticate({"username":"alice","password":"test-password-long"}, True, "127.0.0.1")
+                accounts.authenticate({"username":"alice","password":"test-password-long-1"}, True, "127.0.0.1")
 
     def test_private_dns_answers_rejected_before_connect(self):
         conn = security.PinnedHTTPS("api.deepseek.com")
