@@ -42,7 +42,7 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
             navFont:parseFloat(css('.mobile-nav span').fontSize),navIcon:rect('.mobile-nav svg').width,
             hiddenSidebar:css('.sidebar').visibility==='hidden',blur:css('.mobile-nav').backdropFilter,
             overflow:document.documentElement.scrollWidth>innerWidth,
-            hits:['#menuBtn','#dateButton','#unitBtn','#accountBtn','#chatInput','#sendBtn','.mobile-nav button'].every(hit),
+            hits:['#menuBtn','#topNewChatBtn','#dateButton','#unitBtn','#chatInput','#sendBtn','.mobile-nav button'].every(hit),
             touchTargets:[...document.querySelectorAll('.composer-shortcuts button,.mobile-nav button')].every(el=>el.getBoundingClientRect().height>=44)};
         });
         assert.ok(layout.header.top>=safeTop,JSON.stringify(layout));
@@ -63,7 +63,8 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
         }
         // All remaining pages must scroll above the navigation, too.
         for(const name of ['today','trend','account']){
-          await page.evaluate(name=>{document.querySelector('.page.active').classList.remove('active');document.querySelector(`#page-${name}`).classList.add('active')},name);
+          await page.evaluate(name=>goPage(name),name);
+          assert.equal(await page.locator('#topNewChatBtn').isVisible(),false);
           const bounds=await page.evaluate(name=>({page:document.querySelector(`#page-${name}`).getBoundingClientRect().bottom,nav:document.querySelector('.mobile-nav').getBoundingClientRect().top}),name);
           assert.ok(bounds.page<=bounds.nav,JSON.stringify(bounds));
         }
@@ -71,6 +72,32 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
         assert.equal(await page.locator('.mobile-nav').isVisible(),false);
         assert.equal(await page.locator('#sidebar').isVisible(),true);
       }
+      await page.evaluate(()=>goPage('chat'));
+      const newButton=page.locator('#topNewChatBtn');
+      const buttonRect=await newButton.boundingBox(),headerRect=await page.locator('.topbar').boundingBox();
+      assert.ok(buttonRect.height>=44&&buttonRect.y>=headerRect.y&&buttonRect.y+buttonRect.height<=headerRect.y+headerRect.height);
+      await page.evaluate(()=>{
+        window.created=[];
+        S.sessionId='old-session';
+        S.sessions=[{id:'old-session',title:'已有记录'}];
+        api.post=async(url,body)=>{
+          window.created.push({url,body});
+          return {session:{id:'new-session'}};
+        };
+        api.get=async url=>url==='/api/coach/sessions'?{sessions:[{id:'new-session',title:'新对话'},...S.sessions]}:{messages:[]};
+        S.busy=true;
+      });
+      await newButton.click();
+      assert.equal(await page.evaluate(()=>window.created.length),0);
+      await page.evaluate(()=>{S.busy=false});
+      await newButton.click();
+      await page.waitForFunction(()=>S.sessionId==='new-session'&&document.activeElement.id==='chatInput');
+      const result=await page.evaluate(()=>({calls:window.created,messages:S.messages,sessions:S.sessions,sidebarOpen:document.querySelector('#sidebar').classList.contains('open')}));
+      assert.equal(result.calls.length,1);
+      assert.equal(result.calls[0].url,'/api/coach/session/create');
+      assert.deepEqual(result.messages,[]);
+      assert.ok(result.sessions.some(s=>s.id==='old-session'));
+      assert.equal(result.sidebarOpen,false);
       assert.deepEqual(errors,[]);
       console.log(`Verified shell ${width}x${height}, safe areas ${safeTop}/${safeBottom}`);
       await page.close();

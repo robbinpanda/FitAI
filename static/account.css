@@ -1,6 +1,7 @@
 /* Account workspace and resilient app controls. */
 .composer textarea{min-width:0;scrollbar-width:thin}.composer textarea:placeholder-shown{overflow-y:hidden}.account-panel>h2{scroll-margin-top:24px}.page-account{scrollbar-width:thin}
 .topbar{gap:18px}.page-identity{flex:1;min-width:0}.page-identity h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top-actions{flex:none;gap:10px;min-width:0}
+.new-chat-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;min-height:44px;padding:0 10px;border:1px solid #e6b7a8;border-radius:13px;background:var(--accent-soft);color:var(--accent-dark);font-size:14px;font-weight:650;white-space:nowrap}.new-chat-button svg{width:18px;height:18px;flex:none}.new-chat-button:hover{background:#f4d0c3}
 .unit-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;min-width:76px;padding:0 12px;white-space:nowrap;flex:none}.unit-button span{font-size:13px;line-height:1}.unit-button svg{width:16px;height:16px;flex:none;color:var(--muted)}
 .personal-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:none;min-width:78px;height:44px;padding:0 14px;white-space:nowrap;border:1px solid var(--line);border-radius:13px;background:var(--paper);font-size:13px;font-weight:600}.personal-button svg{width:19px;height:19px;flex:none}.personal-button:hover,.personal-button[aria-current="page"]{color:var(--accent-dark);background:var(--accent-soft)}
 .date-control{height:44px;flex:none;white-space:nowrap}.date-control>button:first-child,.date-control>button:nth-child(3){width:36px;height:38px;display:grid;place-items:center}.date-control svg{width:17px;height:17px}.date-control #dateButton{min-width:74px}.icon-button{width:44px;height:44px;flex:none}
@@ -19,6 +20,8 @@
 @media(prefers-reduced-motion:reduce){.welcome{animation:none}}
 @media(max-width:390px){.welcome h2{font-size:26px;line-height:1.4}}
 @media(max-width:1100px){.menu-backdrop{left:270px}}
+/* The bottom navigation already provides My Account on narrow chat screens. */
+@media(max-width:480px){.topbar:has(.new-chat-button:not([hidden])) #accountBtn{display:none}.new-chat-button{font-size:13px}}
 
 /* Keep phone controls clear and above the iOS status / home-indicator areas.
    Reserve the navigation space once, in the shell, rather than in the composer. */

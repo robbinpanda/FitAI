@@ -143,6 +143,7 @@ function goPage(page) {
   $$('.page').forEach(el => el.classList.toggle('active', el.id === `page-${page}`));
   $$('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   $('#pageEyebrow').textContent = pageMeta[page][0]; $('#pageTitle').textContent = pageMeta[page][1];
+  $('#topNewChatBtn').hidden = page !== 'chat';
   closeSidebar();
   $('#accountBtn').setAttribute('aria-current', page === 'account' ? 'page' : 'false');
   $('.date-control').hidden = page === 'account';
@@ -661,6 +662,7 @@ function bind() {
   $('#menuBackdrop').onclick=closeSidebar;
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSidebar()});
   $('#settingsBtn').onclick=()=>openSettings(); $('#newChatBtn').onclick=createSession;
+  $('#topNewChatBtn').onclick=createSession;
   $('#accountBack').onclick=()=>goPage(accountReturnPage);
   $('#cancelSettingsBtn').onclick=()=>openSettings($('.settings-tabs button.active')?.dataset.tab||'profile');
   $('#logoutEntry').onclick=()=>openMask('accountMask');
