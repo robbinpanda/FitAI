@@ -2434,17 +2434,19 @@ def history(days=30, end_date=None):
         ).fetchall()
         wmap = {r["date"]: r["weight"] for r in rows}
         mrows = c.execute(
-            """SELECT date, SUM(kcal) k, SUM(protein) p FROM meals
+            """SELECT date, SUM(kcal) k, SUM(protein) p, COUNT(*) n FROM meals
                WHERE date BETWEEN ? AND ? AND deleted_at IS NULL GROUP BY date""",
             (start.isoformat(), end.isoformat()),
         ).fetchall()
         mmap = {r["date"]: (r["k"] or 0, r["p"] or 0) for r in mrows}
+        meal_counts = {r["date"]: r["n"] for r in mrows}
         erows = c.execute(
-            """SELECT date, SUM(kcal) k FROM exercises
+            """SELECT date, SUM(kcal) k, COUNT(*) n FROM exercises
                WHERE date BETWEEN ? AND ? AND deleted_at IS NULL GROUP BY date""",
             (start.isoformat(), end.isoformat()),
         ).fetchall()
         emap = {r["date"]: (r["k"] or 0) for r in erows}
+        exercise_counts = {r["date"]: r["n"] for r in erows}
         prev = c.execute(
             "SELECT date, weight FROM weights WHERE date<? ORDER BY date DESC LIMIT 1",
             (start.isoformat(),),
@@ -2483,6 +2485,7 @@ def history(days=30, end_date=None):
                 "weight_source": src if w is not None else (src if src == "last_measured" else src),
                 "weight_date": wdate if src in ("measured", "last_measured") else None,
                 "has_meals": has_meals,
+                "record_counts": {"meal": meal_counts.get(d, 0), "exercise": exercise_counts.get(d, 0), "weight": int(w is not None)},
                 "meal_status": status,
                 "intake": round(intake, 1) if has_meals else None,
                 "protein": round(protein, 1) if has_meals else None,

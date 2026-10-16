@@ -185,6 +185,7 @@ async function loadState() {
     const p = state.today?.profile || {};
     $('#profileTitle').textContent = p.target_weight ? `目标 ${round(p.target_weight, 1)} kg` : '个人档案';
     $('#profileSub').textContent = state.settings?.has_key ? `AI · ${state.settings.text_model}` : '点击配置 AI 模型';
+    H.loaded = null; H.pending = null; H.sequence++;
     renderToday(); renderTrend(); renderAccount();
   } catch (e) { toast(e.message); }
 }
@@ -306,7 +307,67 @@ function bindChartResize() {
     for (const id of ['weightChart','intakeChart']) observer.observe(document.getElementById(id));
   } else window.addEventListener('resize',redraw,{passive:true});
 }
+const H = { month: TODAY.slice(0, 7), loaded: null, pending: null, sequence: 0, rows: [], selected: null };
+function heatmapMonthInfo(month) {
+  const [year, number] = month.split('-').map(Number);
+  const days = new Date(year, number, 0).getDate();
+  return { days, offset: (new Date(`${month}-01T12:00:00`).getDay() + 6) % 7, end: `${month}-${String(days).padStart(2, '0')}` };
+}
+function heatmapCounts(row) {
+  const counts = row?.record_counts || {};
+  const meal = Math.max(0, Number(counts.meal) || 0), exercise = Math.max(0, Number(counts.exercise) || 0), weight = Math.max(0, Number(counts.weight) || 0);
+  return { meal, exercise, weight, total: meal + exercise + weight };
+}
+function changeHeatmapMonth(step) {
+  const date = new Date(`${H.month}-01T12:00:00`);
+  date.setMonth(date.getMonth() + step);
+  const next = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  if (next > TODAY.slice(0, 7) || date.getFullYear() < 1990) return;
+  H.month = next; H.selected = null;
+  loadHeatmap();
+}
+async function loadHeatmap(force = false) {
+  if (!force && (H.loaded === H.month || H.pending === H.month)) return;
+  const month = H.month, sequence = ++H.sequence, info = heatmapMonthInfo(month);
+  H.pending = month; H.loaded = null;
+  $('#heatmapMonth').textContent = `${Number(month.slice(0, 4))} 年 ${Number(month.slice(5))} 月`;
+  $('#heatmapNext').disabled = month >= TODAY.slice(0, 7);
+  $('#heatmapPrev').disabled = month === '1990-01';
+  $('#monthHeatmap').setAttribute('aria-busy', 'true');
+  $('#monthHeatmap').innerHTML = '<p class="heatmap-state">正在加载本月记录…</p>';
+  $('#heatmapSummary').textContent = ''; $('#heatmapDetail').textContent = '';
+  try {
+    const end = info.end > TODAY ? TODAY : info.end;
+    const data = await api.get(`/api/history?days=${info.days}&end=${end}`);
+    if (sequence !== H.sequence) return;
+    H.rows = data.history || []; H.loaded = month;
+    renderHeatmap();
+  } catch (error) {
+    if (sequence !== H.sequence) return;
+    $('#monthHeatmap').innerHTML = '<p class="heatmap-state">本月记录加载失败 <button class="soft-button" data-heatmap-retry>重试</button></p>';
+  } finally {
+    if (sequence === H.sequence) { H.pending = null; $('#monthHeatmap').setAttribute('aria-busy', 'false'); }
+  }
+}
+function renderHeatmap() {
+  const { days, offset } = heatmapMonthInfo(H.month);
+  const rows = new Map(H.rows.map(row => [row.date, row]));
+  let logged = 0, total = 0;
+  const cells = Array.from({ length: offset }, () => '<span aria-hidden="true"></span>');
+  for (let day = 1; day <= days; day++) {
+    const date = `${H.month}-${String(day).padStart(2, '0')}`, future = date > TODAY;
+    const counts = heatmapCounts(rows.get(date));
+    if (!future) { logged += counts.total > 0 ? 1 : 0; total += counts.total; }
+    const label = `${date}，${future ? '尚未到来' : counts.total ? `饮食 ${counts.meal} 条，运动 ${counts.exercise} 条，体重 ${counts.weight} 条` : '暂无记录'}`;
+    cells.push(`<button class="heatmap-day" data-heatmap-date="${date}" data-level="${future ? 0 : Math.min(4, counts.total)}" ${future ? 'disabled' : ''} ${date === TODAY ? 'aria-current="date"' : ''} aria-pressed="${H.selected === date}" aria-label="${label}" title="${label}">${day}</button>`);
+  }
+  $('#monthHeatmap').innerHTML = `<div class="heatmap-weekdays" aria-hidden="true">${['一','二','三','四','五','六','日'].map(day => `<span>${day}</span>`).join('')}</div><div class="heatmap-grid">${cells.join('')}</div>`;
+  $('#heatmapSummary').textContent = `本月已记录 ${logged} 天 · 共 ${total} 条`;
+  const selected = H.selected && rows.get(H.selected), counts = heatmapCounts(selected);
+  $('#heatmapDetail').textContent = H.selected ? `${H.selected} · ${counts.total ? `饮食 ${counts.meal} 条 / 运动 ${counts.exercise} 条 / 体重 ${counts.weight} 条` : '暂无记录'}` : '点击日期查看记录 · 饮食按食物条目计数';
+}
 function renderTrend() {
+  if (S.page === 'trend') loadHeatmap();
   const rows = (S.history || []).slice(-S.range); if (!rows.length) return;
   const measured = rows.filter(r => r.weight_source === 'measured' && r.weight != null); const logged = rows.filter(r => r.has_meals);
   const delta = measured.length > 1 ? round(measured.at(-1).weight - measured[0].weight, 1) : null;
@@ -320,7 +381,6 @@ function renderTrend() {
   ];
   $('#trendKpis').innerHTML = cards.map(c => `<article class="trend-kpi panel"><span>${c[0]}</span><strong>${c[1]}</strong><small>${c[2]}</small></article>`).join('');
   renderTrendCharts();
-  $('#dayDots').innerHTML = rows.map(r => `<div class="day-dot"><i class="${r.has_meals ? 'logged' : ''}" title="${esc(r.date)} · ${statusText(r.meal_status)}"></i><small>${r.date.slice(8)}</small></div>`).join('');
 }
 
 async function loadSessions(selectLatest = false) {
@@ -642,6 +702,16 @@ async function exportData(){try{const data=await api.get('/api/export');const bl
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
+  $('#heatmapPrev').onclick = () => changeHeatmapMonth(-1);
+  $('#heatmapNext').onclick = () => changeHeatmapMonth(1);
+  $('#monthHeatmap').onclick = event => {
+    if (event.target.closest('[data-heatmap-retry]')) { loadHeatmap(true); return; }
+    const day = event.target.closest('[data-heatmap-date]');
+    if (!day) return;
+    H.selected = day.dataset.heatmapDate;
+    renderHeatmap();
+    $(`[data-heatmap-date="${H.selected}"]`).focus({ preventScroll: true });
+  };
   syncFontSizeControls();
   $$('[data-font-choice]').forEach(button => button.addEventListener('click', () => setFontSize(button.dataset.fontChoice)));
   bindModalViewport();
