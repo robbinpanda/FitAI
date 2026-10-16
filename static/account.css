@@ -37,10 +37,13 @@
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   body{overscroll-behavior:none}
   .ambient{display:none}
-  .app-shell{padding-top:var(--app-safe-top);background:var(--bg)}
-  .main{padding-bottom:var(--phone-nav-space)}
+  .app-shell{background:var(--bg)}
+  .main{padding-top:calc(var(--topbar) + var(--app-safe-top));padding-bottom:var(--phone-nav-space)}
   .page{height:auto;flex:1;min-height:0}
-  .topbar{height:var(--topbar);background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+  /* iOS applies its own scroll-edge blur above ordinary flow content. Anchor
+     an opaque, full-width header to the viewport's top, including the safe area,
+     so WebKit can recognize a fixed top edge. CSS blur:none alone cannot do this. */
+  .topbar{position:fixed;top:0;left:0;right:0;height:calc(var(--topbar) + var(--app-safe-top));padding-top:var(--app-safe-top);background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
   .sidebar{visibility:hidden;backdrop-filter:none;-webkit-backdrop-filter:none;padding-top:max(28px,var(--app-safe-top));padding-bottom:max(20px,var(--app-safe-bottom))}
   .sidebar.open{visibility:visible}
   .date-control,.unit-button,.icon-button,.personal-button{background:var(--paper);color:var(--ink)}

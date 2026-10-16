@@ -38,14 +38,21 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
           const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
           const css=s=>getComputedStyle(document.querySelector(s));
           const hit=s=>{const el=document.querySelector(s),r=el.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===h||el.contains(h)};
-          return {header:rect('.topbar'),nav:rect('.mobile-nav'),composer:rect('.composer-wrap'),scroll:rect('.message-scroll'),
+          return {header:rect('.topbar'),headerPosition:css('.topbar').position,headerBackground:css('.topbar').backgroundColor,
+            controlsTop:Math.min(...['#menuBtn','#topNewChatBtn','#dateButton','#unitBtn'].map(s=>rect(s).top)),
+            nav:rect('.mobile-nav'),composer:rect('.composer-wrap'),scroll:rect('.message-scroll'),
             navFont:parseFloat(css('.mobile-nav span').fontSize),navIcon:rect('.mobile-nav svg').width,
             hiddenSidebar:css('.sidebar').visibility==='hidden',blur:css('.mobile-nav').backdropFilter,
             overflow:document.documentElement.scrollWidth>innerWidth,
             hits:['#menuBtn','#topNewChatBtn','#dateButton','#unitBtn','#chatInput','#sendBtn','.mobile-nav button'].every(hit),
             touchTargets:[...document.querySelectorAll('.composer-shortcuts button,.mobile-nav button')].every(el=>el.getBoundingClientRect().height>=44)};
         });
-        assert.ok(layout.header.top>=safeTop,JSON.stringify(layout));
+        assert.equal(layout.header.top,0,JSON.stringify(layout));
+        assert.equal(layout.header.width,width,JSON.stringify(layout));
+        assert.equal(layout.headerPosition,'fixed');
+        assert.equal(layout.headerBackground,'rgb(246, 243, 238)');
+        assert.ok(layout.controlsTop>=safeTop,JSON.stringify(layout));
+        assert.ok(layout.scroll.top>=layout.header.bottom,JSON.stringify(layout));
         assert.ok(layout.nav.bottom<=height-safeBottom-8,JSON.stringify(layout));
         assert.ok(layout.composer.bottom<=layout.nav.top,JSON.stringify(layout));
         assert.ok(layout.scroll.bottom<=layout.composer.top+1,JSON.stringify(layout));
@@ -53,6 +60,10 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
         assert.ok(layout.navFont>=13&&layout.navIcon>=26,JSON.stringify(layout));
         assert.equal(layout.blur,'none');assert.ok(layout.hiddenSidebar);
         assert.equal(layout.overflow,false);assert.ok(layout.hits);assert.ok(layout.touchTargets);
+        await page.locator('#messageScroll').evaluate(el=>{el.scrollTop=0});
+        assert.equal((await page.locator('.topbar').boundingBox()).y,0);
+        await page.locator('#messageScroll').evaluate(el=>{el.scrollTop=el.scrollHeight});
+        assert.equal((await page.locator('.topbar').boundingBox()).y,0);
         await page.locator('#menuBtn').click();
         assert.equal(await page.locator('#sidebar').isVisible(),true);
         await page.locator('#menuBackdrop').click({position:{x:5,y:100}});
