@@ -151,6 +151,6 @@ ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18765:127.0.0.1:8765 fitai-serve
 
 用户在 iPhone 14 Pro / iOS 27.0.1 从桌面图标打开，反馈上一轮实色化后顶栏仍模糊。结合 [WebKit 固定边缘与系统滚动边缘效果实现](https://github.com/WebKit/WebKit/pull/47943) 及 [iOS 27 实机实验](https://tips.ojapp.app/en/ios-27-pwa-top-blur-workaround-2/)，目前最符合现象的解释是系统滚动边缘模糊；网页自身的 backdrop-filter:none 无法直接关闭系统效果。
 
-手机顶栏由普通流布局改为 position:fixed，锚定视口 top:0，实色背景覆盖全宽及顶部安全区，按钮仍位于安全区下方；主区域统一预留对应高度，取消外壳的重复顶部留白。CSS 版本为 ios-fixed-header-1。浏览器验证固定背景从 y=0 覆盖全宽、滚动不移动、控制按钮避开安全区、消息不被挡住，以及侧栏、新会话、长餐食弹窗交互。尚未在用户设备验证系统模糊是否消失，不将模拟器布局通过视为实机修复确认。
+手机顶栏由普通流布局改为 position:fixed，锚定视口 top:0，实色背景覆盖全宽及顶部安全区，按钮仍位于安全区下方；主区域统一预留对应高度，取消外壳的重复顶部留白。CSS 版本为 ios-fixed-header-1。浏览器验证固定背景从 y=0 覆盖全宽、滚动不移动、控制按钮避开安全区、消息不被挡住，以及侧栏、新会话、长餐食弹窗交互。用户随后在同一台 iPhone 14 Pro / iOS 27.0.1 的桌面应用中实机确认：顶部文字已不再模糊，显示正常。
 
 线上两份静态文件与本地比对通过，未重启服务。备份：`/var/backups/fitai/ios-fixed-header-20261016-172527/`。
