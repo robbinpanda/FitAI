@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="拍拍记 · AI 减脂记录助手。拍一张照估算热量与营养，说一句话记下饮食、运动和体重，AI 教练结合你的记录给出建议。">
+<meta name="theme-color" content="#fafaf9"><title>拍拍记 · 拍一张照，AI 帮你算清这一餐</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg?v=snap-1">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="拍拍记">
+<link rel="preload" as="image" href="/meal-400.webp" imagesrcset="/meal-400.webp 400w, /meal-720.webp 720w" imagesizes="(max-width:700px) 260px, 340px" type="image/webp">
+<link rel="stylesheet" href="/public.css?v=jianjianfei-2"><link rel="stylesheet" href="/landing.css?v=20261016c">
+</head>
+<body class="public-page landing-page">
+<a class="skip" href="#main">跳到主要内容</a>
+<header class="site-header"><div class="header wrap">
+<a class="logo" href="/" aria-label="拍拍记首页"><img src="/logo.svg?v=snap-1" alt="" width="32" height="32"><b>拍拍记</b></a>
+<nav class="nav" aria-label="主导航"><a href="#features">功能</a><a href="#photo-demo">拍照体验</a><a href="#trend">趋势</a><a href="#trust">隐私</a></nav>
+<div class="account"><a id="loginLink" href="/auth.html">登录</a><a class="button small" id="registerLink" href="/auth.html?mode=register">免费开始</a></div>
+</div></header>
+<main id="main">
+
+<section class="hero">
+<div class="hero-glow" aria-hidden="true"></div>
+<div class="hero-inner wrap">
+<div class="hero-copy">
+<p class="badge"><i aria-hidden="true"></i>AI 减脂记录助手 · 邀请内测中</p>
+<h1>拍一张照，<br><span>AI 算清这一餐。</span></h1>
+<p class="hero-lead">拍照识别估算热量与三大营养素，说一句话记下饮食、运动和体重。AI 教练结合你的真实记录给建议，每一条都由你确认后保存。</p>
+<div class="hero-actions"><a class="button" href="/auth.html?mode=register" data-start>免费开始记录 <span aria-hidden="true">→</span></a><a class="ghost" href="#photo-demo">先体验一下</a></div>
+<ul class="hero-points" aria-label="核心价值">
+<li><b>1 张照片</b><span>记下一整餐</span></li>
+<li><b>1 句话</b><span>记下运动和体重</span></li>
+<li><b>0 下载</b><span>手机浏览器即用</span></li>
+</ul>
+</div>
+
+<div class="phone" aria-label="拍拍记拍照识别界面示例">
+<div class="phone-screen">
+<div class="phone-top"><span>12:30</span><span class="phone-notch" aria-hidden="true"></span><span>午餐</span></div>
+<div class="scan">
+<picture><source type="image/webp" srcset="/meal-400.webp 400w, /meal-720.webp 720w" sizes="(max-width:700px) 260px, 340px"><img src="/meal-400.jpg" width="400" height="400" alt="三文鱼意面、番茄和菠菜的餐食示意" fetchpriority="high" decoding="async"></picture>
+<span class="scan-line" aria-hidden="true"></span>
+<span class="tag t1">三文鱼 · 230 kcal</span><span class="tag t2">意面 · 221 kcal</span><span class="tag t3">番茄菠菜 · 40 kcal</span>
+<small class="scan-note">AI 生成 · 餐食示意</small>
+</div>
+<div class="result">
+<div class="result-head"><span>本餐估算</span><b>536 <small>kcal</small></b></div>
+<div class="bars">
+<div><span>蛋白质</span><i style="--w:74%"></i><b>37 g</b></div>
+<div><span>碳水</span><i style="--w:58%;--c:#c5a870"></i><b>52 g</b></div>
+<div><span>脂肪</span><i style="--w:45%;--c:#ca7352"></i><b>20 g</b></div>
+</div>
+<div class="result-cta"><span>份量可调整</span><span class="pill">✓ 确认保存</span></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="features wrap" id="features">
+<div class="section-head"><p class="eyebrow">四件事，替你做好</p><h2>记录不再是负担，<br><span>坚持才变得自然。</span></h2></div>
+<div class="bento">
+<article class="card big"><span class="icon" aria-hidden="true">◎</span><h3>拍照识别营养</h3><p>拍下餐盘，AI 拆分食物、估算份量，给出热量、蛋白质、碳水和脂肪。份量不准？点一下就能改。</p><div class="mini-chips"><span>食物拆分</span><span>份量估算</span><span>三大营养素</span></div></article>
+<article class="card"><span class="icon" aria-hidden="true">✦</span><h3>一句话记录</h3><p>“晚饭后快走了半小时”“今天 68.4 公斤”，说完即可整理成记录。</p></article>
+<article class="card"><span class="icon" aria-hidden="true">◇</span><h3>AI 教练建议</h3><p>结合你近期的饮食、运动和体重，回答“晚饭还能吃什么”，可选联网搜索。</p></article>
+<article class="card wide"><span class="icon" aria-hidden="true">↘</span><h3>看清长期趋势</h3><p>体重不被一天的波动左右。缺测的日子不算作零，趋势更真实。</p></article>
+</div>
+</section>
+
+<section class="steps-band"><div class="wrap">
+<div class="section-head light"><p class="eyebrow">怎么用</p><h2>三步，<span>开始轻盈。</span></h2></div>
+<ol class="steps">
+<li><b>01</b><h3>拍照或说一句</h3><p>吃饭前拍一张，运动后说一句。</p></li>
+<li><b>02</b><h3>AI 整理估算</h3><p>自动拆分食物、计算热量与营养。</p></li>
+<li><b>03</b><h3>你确认后保存</h3><p>任何新增、修改、删除都先给你过目。</p></li>
+</ol>
+<div class="chat-demo" aria-label="对话记录示例">
+<p class="bubble user">晚饭后快走了半小时。</p>
+<div class="bubble ai"><img src="/logo.svg?v=snap-1" alt="" width="28" height="28"><div><span>快走 · 30 分钟</span><b>约 150 kcal</b><small>估算示例 · 随体重与强度变化</small></div><em>待确认</em></div>
+</div>
+</div></section>
+
+<section class="photo-section wrap" id="photo-demo">
+<div class="section-head"><p class="eyebrow">在线体验 · 无需登录</p><h2>拍下你的这一餐，<br><span>马上看看热量。</span></h2><p>不用注册，直接上传一张餐食照片，AI 拆分食物、估算热量与营养。</p><div class="trial"><label class="button trial-pick"><input id="trialFile" type="file" accept="image/*" hidden>📷 拍照 / 选一张照片</label><p id="trialStatus" class="trial-status" role="status">每天可免费试 3 次 · 照片仅用于本次识别，不会保存</p></div></div>
+<div class="photo-workflow">
+<div class="food-output">
+<div class="assistant-heading"><img src="/logo.svg?v=snap-1" alt="" width="30" height="30"><b>这餐有这些食物</b><span id="foodBadge">估算示例</span></div>
+<div class="trial-preview" id="trialPreview" hidden><img id="trialImage" alt="你上传的餐食照片"></div><table class="food-list"><thead><tr><th scope="col">食物</th><th scope="col">份量</th><th scope="col">热量</th></tr></thead><tbody id="foodRows"><tr><th scope="row">三文鱼</th><td>120 g</td><td>230 kcal</td></tr><tr><th scope="row">意面</th><td><select id="demoPasta" aria-label="调整示例意面份量"><option value="100">100 g</option><option value="150" selected>150 g</option><option value="200">200 g</option></select></td><td id="pastaEnergy">221 kcal</td></tr><tr><th scope="row">番茄与菠菜</th><td>120 g</td><td>40 kcal</td></tr><tr><th scope="row">橄榄油</th><td>5 g</td><td>45 kcal</td></tr></tbody></table>
+<div class="demo-total" aria-live="polite"><div><span>本餐合计</span><strong id="foodTotal">536 kcal</strong></div><p id="foodMacros">蛋白质 37 g · 碳水 52 g · 脂肪 20 g</p></div>
+<div class="demo-save"><p id="foodDemoStatus" role="status">先试着调整意面份量，看看营养变化。</p><button class="button" id="confirmFoodDemo" type="button">确认示例</button></div>
+</div>
+</div>
+</section>
+
+<section class="trend-section wrap" id="trend">
+<div class="section-head"><p class="eyebrow">长期趋势</p><h2>每一小步，<br><span>都看得见。</span></h2><p>不被一天的数字左右，把目光放远一点。</p></div>
+<div class="trend-card"><div class="chart-heading"><span>体重趋势 <small>示例</small></span><div class="range" role="group" aria-label="示例趋势范围"><button type="button" class="active" aria-pressed="true" data-range="14">14 天</button><button type="button" aria-pressed="false" data-range="30">30 天</button></div></div>
+<div class="weight-summary"><div><strong id="demoWeight">68.4</strong><span>kg</span></div><p id="demoChange">较起点 −1.2 kg</p></div>
+<svg class="trend-chart" viewBox="0 0 560 235" role="img" aria-labelledby="chartTitle"><title id="chartTitle">14 天体重示例：从 69.6 kg 波动下降至 68.4 kg，不代表减重承诺</title><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d3dfd0" stop-opacity=".65"/><stop offset="1" stop-color="#d3dfd0" stop-opacity="0"/></linearGradient></defs><g class="grid"><path d="M42 32H540M42 86H540M42 140H540M42 194H540"/></g><g class="axis"><text x="0" y="36">70</text><text x="0" y="90">69</text><text x="0" y="144">68</text><text x="0" y="198">67</text><text x="42" y="226">第 1 天</text><text x="265" y="226" id="chartMid">第 7 天</text><text x="491" y="226" id="chartEnd">第 14 天</text></g><path id="chartArea" fill="url(#chartFill)" d="M45 54L84 69L122 61L160 87L198 80L236 97L274 87L312 114L350 106L388 119L426 110L464 122L502 111L536 118V194H45Z"/><path id="chartLine" d="M45 54L84 69L122 61L160 87L198 80L236 97L274 87L312 114L350 106L388 119L426 110L464 122L502 111L536 118" fill="none" stroke="#597552" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle id="chartDot" cx="536" cy="118" r="6" fill="#597552" stroke="white" stroke-width="3"/></svg>
+</div>
+</section>
+
+<section class="trust wrap" id="trust">
+<div class="section-head"><p class="eyebrow">安心使用</p><h2>你的数据，<span>只属于你。</span></h2></div>
+<div class="trust-grid">
+<div><b>先确认，再保存</b><p>AI 不会擅自改动你的记录，每一次写入都需要你点头。</p></div>
+<div><b>账号数据隔离</b><p>每个账号独立存储，密码只保存不可逆哈希。</p></div>
+<div><b>估算，不夸大</b><p>营养为估算值，可随时调整；不做减重承诺。</p></div>
+</div>
+</section>
+
+<section class="closing wrap">
+<img src="/logo.svg?v=snap-1" width="52" height="52" alt="">
+<h2>从下一顿饭开始，<br><span>把减脂变简单。</span></h2>
+<p>手机浏览器打开即可使用，也可以添加到桌面，像 App 一样打开。</p>
+<div class="closing-actions"><a class="button" href="/auth.html?mode=register" data-start>免费开始记录 <span aria-hidden="true">→</span></a><button class="ghost" type="button" data-install hidden>添加到手机桌面</button></div>
+</section>
+</main>
+
+<div class="mobile-cta"><a class="button" href="/auth.html?mode=register" data-start>免费开始记录 →</a></div>
+
+<footer class="footer"><div class="wrap"><div class="footer-top"><a class="logo" href="/"><img src="/logo.svg?v=snap-1" alt="" width="28" height="28"><b>拍拍记</b></a><a href="/auth.html" class="text-link">登录我的账号 →</a></div><p>展示中的餐食、记录与趋势均为示例，不代表实际使用结果或减重承诺。营养为估算值，请根据实际份量调整；如有疾病或特殊饮食需求，请咨询医生或营养师。</p><div class="footer-bottom"><span>© 2026 拍拍记 · <a class="beian" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">沪ICP备2026053161号</a></span><span>好好生活，慢慢轻盈。</span></div></div></footer>
+<script src="/landing.js?v=20261016b"></script>
+<script src="/pwa.js?v=4" defer></script>
+</body></html>

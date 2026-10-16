@@ -1,0 +1,21 @@
+{
+  "name": "拍拍记 · AI 减脂记录助手",
+  "short_name": "拍拍记",
+  "description": "拍照估算热量，一句话记录饮食、运动和体重。",
+  "lang": "zh-CN",
+  "id": "/index.html",
+  "start_url": "/index.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f4ef",
+  "theme_color": "#fafaf9",
+  "icons": [
+    {"src": "/icon-192.png?v=4", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icon-512.png?v=4", "sizes": "512x512", "type": "image/png"},
+    {"src": "/icon-maskable-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "拍照记一餐", "url": "/index.html?source=pwa", "icons": [{"src": "/icon-192.png?v=4", "sizes": "192x192"}]}
+  ]
+}

@@ -4,7 +4,8 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const TODAY = new Date().toLocaleDateString('sv-SE');
 const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null, recordingIntent: '' };
-const pageMeta = { chat: ['私人减脂助手', '和 渐渐飞 聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'] };
+const pageMeta = { chat: ['私人减脂助手', '和拍拍记聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'], account: ['MY SPACE', '个人中心'] };
+let accountReturnPage = 'chat';
 const undoRecords = [];
 
 function esc(v) { return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
@@ -21,12 +22,14 @@ const api = {
   async get(path) {
     const res = await fetch(path, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
     if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
     return data;
   },
   async post(path, body) {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-FitAI-Token': S.token }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
     if (!res.ok) throw new Error(data.error || `请求失败 (${res.status})`);
     return data;
   }
@@ -51,6 +54,7 @@ function scheduleChatPaint() {
 async function streamAgent(body, onEvent, signal) {
   const response = await fetch('/api/agent', {method:'POST', signal,
     headers:{'Content-Type':'application/json','X-FitAI-Token':S.token}, body:JSON.stringify({...body,stream:true})});
+  if (response.status === 401) { location.replace('/auth.html'); throw new Error('登录已失效'); }
   if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
@@ -91,11 +95,34 @@ function setBusy(on) {
   if (on) { $('#typing em').textContent = '正在理解你的输入…'; followChat = true; scrollChat(); }
 }
 let modalReturnFocus = null;
+function bindModalViewport() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  const sync = () => {
+    // Pinch zoom should retain native panning, not resize the dialog again.
+    if (Math.abs(viewport.scale - 1) > 0.01) return;
+    document.documentElement.style.setProperty('--visual-viewport-height', `${viewport.height}px`);
+    document.documentElement.style.setProperty('--visual-viewport-top', `${viewport.offsetTop}px`);
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      const content = active?.closest('.tool-modal-content');
+      if (!content || active === content) return;
+      const field = active.getBoundingClientRect(), area = content.getBoundingClientRect();
+      if (field.bottom > area.bottom) content.scrollTop += field.bottom - area.bottom + 12;
+      else if (field.top < area.top) content.scrollTop -= area.top - field.top + 12;
+    });
+  };
+  viewport.addEventListener('resize', sync, {passive:true});
+  viewport.addEventListener('scroll', sync, {passive:true});
+  sync();
+}
 function openMask(id) {
   modalReturnFocus = document.activeElement;
   const el = document.getElementById(id); el.hidden = false; document.body.classList.add('modal-open');
   $('.app-shell').inert = true; $('.mobile-nav').inert = true;
-  el.querySelector('button,input,select,textarea')?.focus();
+  const content = el.querySelector('.tool-modal-content');
+  if (content) content.scrollTop = 0;
+  el.querySelector('button,input,select,textarea')?.focus({preventScroll:true});
 }
 function closeMask(id) {
   const el = document.getElementById(id); el.hidden = true; document.body.classList.remove('modal-open');
@@ -116,9 +143,25 @@ function goPage(page) {
   $$('.page').forEach(el => el.classList.toggle('active', el.id === `page-${page}`));
   $$('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   $('#pageEyebrow').textContent = pageMeta[page][0]; $('#pageTitle').textContent = pageMeta[page][1];
-  $('#sidebar').classList.remove('open');
+  closeSidebar();
+  $('#accountBtn').setAttribute('aria-current', page === 'account' ? 'page' : 'false');
+  $('.date-control').hidden = page === 'account';
+  $('#unitBtn').hidden = page === 'account';
   if (page === 'today') renderToday();
   if (page === 'trend') renderTrend();
+}
+
+function closeSidebar() {
+  $('#sidebar').classList.remove('open');
+  $('#menuBackdrop').hidden = true;
+  $('#menuBtn').setAttribute('aria-expanded', 'false');
+}
+
+function renderAccount() {
+  const p = S.state?.today?.profile || {};
+  $('#accountUsername').textContent = S.username || '我的账号';
+  $('#accountTarget').textContent = p.target_weight ? `${round(p.target_weight, 1)} kg` : '待设置';
+  $('#accountWeekly').textContent = Number(p.weekly_loss) > 0 ? `减 ${p.weekly_loss} kg` : '保持体重';
 }
 
 async function setDate(value) {
@@ -140,7 +183,7 @@ async function loadState() {
     const p = state.today?.profile || {};
     $('#profileTitle').textContent = p.target_weight ? `目标 ${round(p.target_weight, 1)} kg` : '个人档案';
     $('#profileSub').textContent = state.settings?.has_key ? `AI · ${state.settings.text_model}` : '点击配置 AI 模型';
-    renderToday(); renderTrend();
+    renderToday(); renderTrend(); renderAccount();
   } catch (e) { toast(e.message); }
 }
 
@@ -149,7 +192,7 @@ function renderToday() {
   const t = S.state?.today; if (!t) return;
   const u = unit(); const has = !!t.has_meals; const intake = has ? energy(t.intake) : null; const target = energy(t.target_intake);
   $('#intakeUnit').textContent = u; $('#intakeValue').textContent = intake ?? '—'; $('#mealStatusBadge').textContent = statusText(t.meal_status);
-  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉 渐渐飞 你吃了什么。';
+  $('#todayStatus').textContent = has ? '已自动汇总你录入的饮食和运动，随时补充或修改即可。' : '还没有饮食记录，直接告诉拍拍记 你吃了什么。';
   $('#energyCaption').textContent = has ? `今日目标约 ${target} ${u}` : '记录饮食后显示目标进度';
   $('#targetValue').textContent = `目标 ${target ?? '—'} ${u}`;
   const pct = has && t.target_intake ? Math.min(115, num(t.intake) / num(t.target_intake) * 100) : 0;
@@ -173,8 +216,9 @@ function renderToday() {
   $('#todayLogs').innerHTML = logs.length ? logs.join('') : '<div class="empty-state">今天还没有记录<br>在对话里说“我吃了…”或“我运动了…”即可开始</div>';
 }
 
-function chartFrame(points, type) {
-  const W = 480, H = 250, L = 64, R = 24, T = 28, B = 48, innerW = W - L - R, innerH = H - T - B;
+function chartFrame(points, type, size = {}) {
+  const W = Math.max(200, size.width || 480), H = Math.max(180, size.height || 250);
+  const L = 64, R = 24, T = 28, B = 48, innerW = W - L - R, innerH = H - T - B;
   const valid = points.map((p,i) => ({...p,i})).filter(p => Number.isFinite(p.value));
   if (!valid.length) return '<div class="empty-state">还没有足够的数据</div>';
   const valueUnit = type === 'line' ? 'kg' : unit();
@@ -202,7 +246,7 @@ function chartFrame(points, type) {
     const right = i < valid.length-1 ? (x(p.i)+x(valid[i+1].i))/2 : W-R;
     return `<g class="chart-hit" role="button" tabindex="0" aria-label="${esc(p.date)}，${round(p.value,1)} ${esc(valueUnit)}" data-chart-date="${esc(p.date)}" data-chart-value="${round(p.value,1)}" data-chart-unit="${esc(valueUnit)}" data-chart-x="${x(p.i)}" data-chart-y="${y(p.value)}"><rect x="${left}" y="${T}" width="${right-left}" height="${innerH}"/></g>`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="group" aria-label="${type==='line'?'体重':'已记录能量摄入'}趋势，横轴日期，纵轴${esc(valueUnit)}。悬停、点击或使用方向键查看记录。">${grids}${axes}${marks}${labels}<line class="chart-guide" y1="${T}" y2="${H-B}" hidden/><circle class="chart-active" r="6" hidden/>${hits}</svg><div class="chart-tooltip" role="status" hidden></div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${type==='line'?'体重':'已记录能量摄入'}趋势，横轴日期，纵轴${esc(valueUnit)}。悬停、点击或使用方向键查看记录。">${grids}${axes}${marks}${labels}<line class="chart-guide" y1="${T}" y2="${H-B}" hidden/><circle class="chart-active" r="6" hidden/>${hits}</svg><div class="chart-tooltip" role="status" hidden></div>`;
 }
 
 function showChartPoint(chart, point) {
@@ -215,7 +259,9 @@ function showChartPoint(chart, point) {
   guide.setAttribute('x1',x); guide.setAttribute('x2',x); guide.hidden = false; guide.removeAttribute('hidden');
   dot.setAttribute('cx',x); dot.setAttribute('cy',y); dot.removeAttribute('hidden');
   const box = svg.getBoundingClientRect(), parent = chart.getBoundingClientRect();
-  const px = box.left-parent.left+x/480*box.width, py = box.top-parent.top+y/250*box.height;
+  const view = svg.viewBox.baseVal, scale = Math.min(box.width/view.width, box.height/view.height);
+  const px = box.left-parent.left+(box.width-view.width*scale)/2+x*scale;
+  const py = box.top-parent.top+(box.height-view.height*scale)/2+y*scale;
   tooltip.style.left = `${Math.max(0,Math.min(chart.clientWidth-tooltip.offsetWidth,px-tooltip.offsetWidth/2))}px`;
   tooltip.style.top = `${Math.max(0,Math.min(chart.clientHeight-tooltip.offsetHeight,py > tooltip.offsetHeight+14 ? py-tooltip.offsetHeight-12 : py+14))}px`;
 }
@@ -239,6 +285,25 @@ function bindChart(chart) {
   });
 }
 
+function renderTrendCharts() {
+  const rows = (S.history || []).slice(-S.range);
+  for (const [id,type] of [['weightChart','line'],['intakeChart','bar']]) {
+    const chart = document.getElementById(id);
+    const points = rows.map(r => ({date:r.date,value:type === 'line'
+      ? r.weight_source === 'measured' && r.weight != null ? num(r.weight,NaN) : null
+      : r.has_meals ? energy(r.intake,1) : null}));
+    const box = chart.getBoundingClientRect();
+    chart.innerHTML = chartFrame(points,type,{width:box.width,height:box.height});
+  }
+  $('#chartUnit').textContent = unit();
+}
+function bindChartResize() {
+  const redraw = () => { if (S.page === 'trend') renderTrendCharts(); };
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(redraw);
+    for (const id of ['weightChart','intakeChart']) observer.observe(document.getElementById(id));
+  } else window.addEventListener('resize',redraw,{passive:true});
+}
 function renderTrend() {
   const rows = (S.history || []).slice(-S.range); if (!rows.length) return;
   const measured = rows.filter(r => r.weight_source === 'measured' && r.weight != null); const logged = rows.filter(r => r.has_meals);
@@ -252,8 +317,7 @@ function renderTrend() {
     ['日均运动', energyText(avgExercise), `近 ${rows.length} 个自然日`]
   ];
   $('#trendKpis').innerHTML = cards.map(c => `<article class="trend-kpi panel"><span>${c[0]}</span><strong>${c[1]}</strong><small>${c[2]}</small></article>`).join('');
-  $('#weightChart').innerHTML = chartFrame(rows.map(r => ({ date:r.date, value:r.weight_source === 'measured' && r.weight != null ? num(r.weight,NaN) : null })), 'line');
-  $('#intakeChart').innerHTML = chartFrame(rows.map(r => ({ date:r.date, value:r.has_meals ? energy(r.intake,1) : null })), 'bar'); $('#chartUnit').textContent = unit();
+  renderTrendCharts();
   $('#dayDots').innerHTML = rows.map(r => `<div class="day-dot"><i class="${r.has_meals ? 'logged' : ''}" title="${esc(r.date)} · ${statusText(r.meal_status)}"></i><small>${r.date.slice(8)}</small></div>`).join('');
 }
 
@@ -263,7 +327,7 @@ async function loadSessions(selectLatest = false) {
   if (!S.sessionId || selectLatest || !S.sessions.some(x => x.id === S.sessionId)) S.sessionId = S.sessions[0].id;
   renderSessions(); await loadMessages();
 }
-function renderSessions() { $('#sessionList').innerHTML = S.sessions.slice(0,8).map(s => `<button class="${s.id === S.sessionId ? 'active' : ''}" data-session="${s.id}" title="${esc(s.title)}">${esc(s.title || '新对话')}</button>`).join(''); }
+function renderSessions() { $('#sessionList').innerHTML = S.sessions.slice(0,8).map(s => `<button class="${s.id === S.sessionId ? 'active' : ''}" data-session="${esc(s.id)}" title="${esc(s.title)}">${esc(s.title || '新对话')}</button>`).join(''); }
 async function createSession() { if(S.busy){toast('请先停止生成，再新建对话');return;} selectRecordingIntent(''); try { const data = await api.post('/api/coach/session/create', { date: S.date, title: '新对话' }); S.sessionId = data.session.id; await loadSessions(); goPage('chat'); $('#chatInput').focus(); } catch (e) { toast(e.message); } }
 async function loadMessages() { if (!S.sessionId) return; try { const data = await api.get(`/api/coach/session?id=${encodeURIComponent(S.sessionId)}`); S.messages = data.messages || []; renderMessages(); } catch (e) { toast(e.message); } }
 
@@ -289,8 +353,8 @@ function toolSummary(call) {
 function toolName(name) { return ({ log_meal:'记录饮食', log_exercise:'记录运动', log_weight:'记录体重', update_meal:'修改饮食',update_exercise:'修改运动',update_weight:'修改体重',delete_meal:'删除饮食',delete_exercise:'删除运动',delete_weight:'删除体重',restore_record:'恢复记录',manage_records:'批量管理记录' })[name] || name; }
 function toolCard(call, messageId) {
   if (call.name === 'mark_day_complete') return '<div class="tool-card"><div class="tool-lines">旧版完成标记已停用；已有记录自动汇总，无需操作。</div></div>';
-  const status = call.status || 'pending'; const statusName = ({pending:'待确认',confirmed:isManagementCall(call)?'已完成':'已记录',rejected:'已取消'})[status] || status;
-  return `<div class="tool-card"><div class="tool-card-head"><span class="tool-symbol">${call.name === 'log_exercise' ? '动' : call.name === 'log_weight' ? '重' : '记'}</span><div><b>${toolName(call.name)}</b><small>${esc(call.arguments?.date || S.date)}</small></div><span class="tool-state ${status}">${statusName}</span></div><div class="tool-lines">${toolSummary(call).map(x => `<div class="tool-line"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${status === 'pending' ? `<div class="tool-card-actions"><button class="confirm" data-tool-open="${esc(call.id)}" data-message="${messageId}">查看并确认</button><button class="reject" data-tool-reject="${esc(call.id)}" data-message="${messageId}">不记录</button></div>` : ''}</div>`;
+  const status = ['pending','confirmed','rejected'].includes(call.status) ? call.status : 'pending'; const statusName = ({pending:'待确认',confirmed:isManagementCall(call)?'已完成':'已记录',rejected:'已取消'})[status] || status;
+  return `<div class="tool-card"><div class="tool-card-head"><span class="tool-symbol">${call.name === 'log_exercise' ? '动' : call.name === 'log_weight' ? '重' : '记'}</span><div><b>${esc(toolName(call.name))}</b><small>${esc(call.arguments?.date || S.date)}</small></div><span class="tool-state ${status}">${statusName}</span></div><div class="tool-lines">${toolSummary(call).map(x => `<div class="tool-line"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${status === 'pending' ? `<div class="tool-card-actions"><button class="confirm" data-tool-open="${esc(call.id)}" data-message="${messageId}">查看并确认</button><button class="reject" data-tool-reject="${esc(call.id)}" data-message="${messageId}">不记录</button></div>` : ''}</div>`;
 }
 function searchSources(data) {
   if (!data) return '';
@@ -299,7 +363,7 @@ function searchSources(data) {
 }
 function renderMessages() {
   $('#welcome').hidden = S.messages.length > 0;
-  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${m.role}">${m.role === 'assistant' ? '<span class="message-avatar"><img src="/logo.svg" alt="渐渐飞" width="29" height="29"></span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
+  $('#messages').innerHTML = S.messages.map(m => `<article class="message ${esc(m.role)}">${m.role === 'assistant' ? '<span class="message-avatar"><img src="/logo.svg?v=snap-1" alt="拍拍记" width="29" height="29"></span>' : ''}<div class="message-body">${m.image_urls?.length ? `<div class="message-images">${m.image_urls.map(u => `<img src="${esc(u)}" alt="用户上传图片">`).join('')}</div>` : ''}<div class="message-text">${richText(m.content)}</div>${searchSources(m.search_data)}${(m.tool_calls || []).map(c => toolCard(c,m.id)).join('')}<small class="message-time">${esc((m.created_at || '').slice(11,16))}</small></div></article>`).join('');
   const streaming = S.messages.find(m => m.streaming);
   if (streaming) {
     const text = $('#messages .message:last-child .message-text');
@@ -487,7 +551,7 @@ function selectRecordingIntent(intent) {
   const hints = {meal:'饮食记录：告诉我吃了什么和大致份量，也可以上传照片',exercise:'运动记录：告诉我做了什么、多久和大致强度',weight:'体重记录：输入本次称重数值'};
   $('#recordingIntent').hidden = !S.recordingIntent;
   $('#recordingIntentText').textContent = hints[S.recordingIntent] || '';
-  $('#chatInput').placeholder = hints[S.recordingIntent] || '告诉我你吃了什么、做了什么，或问任何减脂问题…';
+  $('#chatInput').placeholder = hints[S.recordingIntent] || '今天想记录什么？';
 }
 function handleChatShortcut(button) {
   if (S.busy) { toast('请等当前回复完成后再切换'); return; }
@@ -511,31 +575,76 @@ function fileToDataUrl(file) { return new Promise((resolve,reject) => { const r=
 function renderImages() { const box=$('#imageStrip'); box.hidden=!S.images.length; box.innerHTML=S.images.map((x,i)=>`<div class="image-thumb"><img src="${x.url}" alt="${esc(x.name)}"><button data-remove-image="${i}">×</button></div>`).join(''); }
 
 function openSettings(tab = 'profile') {
+  if (!S.state) { toast('资料正在加载，请稍后再试'); return; }
+  const entering = S.page !== 'account';
+  if (entering) accountReturnPage = S.page;
   const s=S.state?.settings||{}, p=S.state?.today?.profile||{};
   $('#profileGender').value=p.gender||'male'; $('#profileAge').value=p.age||''; $('#profileHeight').value=p.height||''; $('#profileStart').value=p.start_weight||S.state?.today?.weight||''; $('#profileTarget').value=p.target_weight||''; $('#profileWeekly').value=String(p.weekly_loss ?? .5); $('#profileActivity').value=String(p.activity||1.2);
-  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent='';
-  $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
-  selectSettingsTab(tab); openMask('settingsMask');
+  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.key_source==='shared'?'正在使用站点默认 API；填写可改用自己的':s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent=''; const q=s.shared_quota; $('#sharedQuota').hidden=!q; if(q) $('#sharedQuota').textContent=`站点默认 API 每天可免费使用 ${q.limit} 次，今天还剩 ${q.remaining} 次（次日自动恢复）。`;
+  $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.tavily_key_source==='shared'?'正在使用站点默认搜索 API':s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
+  renderAccount(); goPage('account'); selectSettingsTab(tab);
+  if (entering) $('#page-account').scrollTop = 0;
 }
-function selectSettingsTab(tab) { $$('.settings-tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab)); $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab)); }
+function selectSettingsTab(tab) {
+  const descriptions = {
+    profile: ['个人信息', '完善基本资料，让建议更适合你。'],
+    plan: ['减肥计划', '设定目标与节奏，按自己的步调来。'],
+    model: ['AI 服务', '查看当前连接，也可以使用自己的模型。'],
+    search: ['联网搜索', '按需查找资料，来源清楚可见。'],
+    data: ['数据与隐私', '管理属于你的记录与备份。'],
+    security: ['账号与登录', '管理当前登录，或切换到其他账号。'],
+  };
+  $$('.settings-tabs button').forEach(x=>{const active=x.dataset.tab===tab;x.classList.toggle('active',active);x.setAttribute('aria-current',active?'page':'false');});
+  $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab));
+  $('#settingsTitle').textContent=descriptions[tab][0];
+  $('#settingsDescription').textContent=descriptions[tab][1];
+  $('#accountSavebar').hidden=['data','security'].includes(tab);
+  $('#accountFeedback').textContent='';
+}
 async function saveSettings() {
-  const btn=$('#saveSettingsBtn'); btn.disabled=true;
-  try { if ($('.settings-tabs button.active')?.dataset.tab === 'profile') await api.post('/api/profile',{gender:$('#profileGender').value,age:num($('#profileAge').value),height:num($('#profileHeight').value),start_weight:$('#profileStart').value ? num($('#profileStart').value) : null,target_weight:num($('#profileTarget').value),weekly_loss:num($('#profileWeekly').value),activity:num($('#profileActivity').value),completed:true}); const key=$('#modelKey').value.trim(), searchKey=$('#tavilyKey').value.trim(); await api.post('/api/settings',{base_url:$('#modelBase').value.trim(),text_model:$('#modelName').value.trim(),api_key:key,api_key_action:key?'replace':'keep',vision_enabled:$('#visionEnabled').checked,vision_api_key_action:'keep',tavily_api_key:searchKey,tavily_api_key_action:searchKey?'replace':'keep',search_enabled:$('#searchEnabled').checked}); $('#modelKey').value=''; $('#tavilyKey').value=''; await loadState(); closeMask('settingsMask'); toast('设置已保存'); }
-  catch(e){toast(e.message)} finally{btn.disabled=false}
+  const tab=$('.settings-tabs button.active')?.dataset.tab;
+  if (!['profile','plan','model','search'].includes(tab)) return;
+  const invalid=$$('.settings-pane.active input,.settings-pane.active select').find(el=>!el.checkValidity());
+  if(invalid){invalid.reportValidity();return;}
+  const btn=$('#saveSettingsBtn'); btn.disabled=true; btn.textContent='正在保存…';
+  $('#accountFeedback').textContent='';
+  try {
+    if (tab==='profile'||tab==='plan') {
+      await api.post('/api/profile',{gender:$('#profileGender').value,age:num($('#profileAge').value),height:num($('#profileHeight').value),start_weight:$('#profileStart').value ? num($('#profileStart').value) : null,target_weight:num($('#profileTarget').value),weekly_loss:num($('#profileWeekly').value),activity:num($('#profileActivity').value),completed:true});
+    } else if (tab==='model') {
+      const key=$('#modelKey').value.trim();
+      await api.post('/api/settings',{base_url:$('#modelBase').value.trim(),text_model:$('#modelName').value.trim(),api_key:key,api_key_action:key?'replace':'keep',vision_enabled:$('#visionEnabled').checked,vision_api_key_action:'keep'});
+      $('#modelKey').value='';
+    } else {
+      const searchKey=$('#tavilyKey').value.trim();
+      await api.post('/api/settings',{tavily_api_key:searchKey,tavily_api_key_action:searchKey?'replace':'keep',search_enabled:$('#searchEnabled').checked});
+      $('#tavilyKey').value='';
+    }
+    await loadState(); openSettings(tab);
+    $('#accountFeedback').textContent='修改已保存。'; toast('修改已保存');
+  } catch(e){$('#accountFeedback').textContent=e.message;toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='保存修改'}
 }
 async function testModel(){const el=$('#testModelStatus');el.textContent='正在测试…';try{const key=$('#modelKey').value.trim();const r=await api.post('/api/test_key',{base_url:$('#modelBase').value.trim(),model:$('#modelName').value.trim(),api_key:key});el.textContent=`连接成功 · ${r.model}`}catch(e){el.textContent=e.message}}
 async function testSearch(){const el=$('#testSearchStatus'),btn=$('#testSearchBtn');btn.disabled=true;el.textContent='正在连接 Tavily…';try{const r=await api.post('/api/test_search',{tavily_api_key:$('#tavilyKey').value.trim()});el.textContent=`${r.message} · ${r.result_count} 条来源`}catch(e){el.textContent=e.message}finally{btn.disabled=false}}
 async function toggleSearch(){const el=$('#searchToggle');if(S.busy){el.checked=!!S.state?.settings?.search_ready;return}if(el.checked&&!S.state?.settings?.has_tavily_key){el.checked=false;openSettings('search');toast('先填写 Tavily API Key');return}el.disabled=true;try{await api.post('/api/settings',{search_enabled:el.checked});await loadState();toast(el.checked?'联网搜索已开启':'联网搜索已关闭')}catch(e){el.checked=!!S.state?.settings?.search_ready;toast(e.message)}finally{el.disabled=false}}
-async function clearSearchKey(){if(!confirm('移除本机保存的 Tavily Key 并关闭联网搜索？'))return;try{await api.post('/api/settings',{tavily_api_key_action:'clear'});await loadState();$('#tavilyKey').value='';$('#tavilyKey').placeholder='tvly-…';$('#searchEnabled').checked=false;$('#testSearchStatus').textContent='Key 已移除，联网搜索已关闭'}catch(e){toast(e.message)}}
-async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`渐渐飞-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
+async function clearOwnKey(kind){
+  const search=kind==='search', action=search?'tavily_api_key_action':'api_key_action';
+  try{await api.post('/api/settings',{[action]:'clear'});await loadState();openSettings(search?'search':'model');toast((search?S.state.settings.has_tavily_key:S.state.settings.has_key)?'个人 Key 已删除，已恢复站点默认 API':'个人 Key 已删除，当前没有站点默认 API')}catch(e){toast(e.message)}
+}
+async function clearSearchKey(){return clearOwnKey('search')}
+
+async function exportData(){try{const data=await api.get('/api/export');const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`拍拍记-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast(e.message)}}
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
+  bindModalViewport();
   bindChart($('#weightChart')); bindChart($('#intakeChart'));
+  bindChartResize();
   document.addEventListener('keydown',event=>{
     const mask=$('.modal-mask:not([hidden])');
     if(!mask||event.key!=='Tab')return;
-    const controls=$$('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]',mask).filter(el=>el.getClientRects().length);
+    const controls=$$('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]',mask).filter(el=>el.getClientRects().length);
     const first=controls[0],last=controls.at(-1);
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
@@ -547,8 +656,14 @@ function bind() {
   $('#messageScroll').addEventListener('scroll',()=>{followChat=chatAtBottom();$('#jumpLatest').hidden=followChat;},{passive:true});
   $('#setupModelBtn').onclick=()=>openSettings('model');
 
-  $$('[data-page]').forEach(x=>x.addEventListener('click',()=>goPage(x.dataset.page)));
-  $('#menuBtn').onclick=()=>$('#sidebar').classList.toggle('open'); $('#settingsBtn').onclick=()=>openSettings(); $('#settingsTopBtn').onclick=()=>openSettings(); $('#newChatBtn').onclick=createSession;
+  $$('[data-page]').forEach(x=>x.addEventListener('click',()=>x.dataset.page==='account'?openSettings():goPage(x.dataset.page)));
+  $('#menuBtn').onclick=()=>{const open=$('#sidebar').classList.toggle('open');$('#menuBackdrop').hidden=!open;$('#menuBtn').setAttribute('aria-expanded',String(open));};
+  $('#menuBackdrop').onclick=closeSidebar;
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSidebar()});
+  $('#settingsBtn').onclick=()=>openSettings(); $('#newChatBtn').onclick=createSession;
+  $('#accountBack').onclick=()=>goPage(accountReturnPage);
+  $('#cancelSettingsBtn').onclick=()=>openSettings($('.settings-tabs button.active')?.dataset.tab||'profile');
+  $('#logoutEntry').onclick=()=>openMask('accountMask');
   $('#prevDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()-1);setDate(isoDate(d))}; $('#nextDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()+1);setDate(isoDate(d))}; $('#dateButton').onclick=()=>{const el=$('#dateInput'); if(el.showPicker)el.showPicker();else el.click()}; $('#dateInput').onchange=e=>setDate(e.target.value);
   $('#unitBtn').onclick=async()=>{const next=unit()==='kcal'?'kJ':'kcal';try{await api.post('/api/prefs',{display_unit:next});S.state.display_unit=next;$('#unitLabel').textContent=next;renderToday();renderTrend()}catch(e){toast(e.message)}};
   $('#cancelRecordingIntent').onclick=()=>selectRecordingIntent('');
@@ -558,7 +673,7 @@ function bind() {
   document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt],[data-record-intent],[data-chat-entry]');if(p)handleChatShortcut(p); const s=e.target.closest('[data-session]');if(s){if(S.busy){toast('请先停止生成，再切换对话');return;}followChat=true;selectRecordingIntent('');S.sessionId=s.dataset.session;renderSessions();loadMessages();goPage('chat')} const rem=e.target.closest('[data-remove-image]');if(rem){S.images.splice(Number(rem.dataset.removeImage),1);renderImages()} const open=e.target.closest('[data-tool-open]');if(open)openTool(open.dataset.message,open.dataset.toolOpen);const rej=e.target.closest('[data-tool-reject]');if(rej){const m=S.messages.find(x=>x.id===Number(rej.dataset.message));const c=m?.tool_calls?.find(x=>x.id===rej.dataset.toolReject);if(c)decideTool('reject',{messageId:Number(rej.dataset.message),call:c})} const close=e.target.closest('[data-close]');if(close)closeMask(close.dataset.close)});
   $('#confirmToolBtn').onclick=()=>decideTool('confirm'); $('#rejectToolBtn').onclick=()=>decideTool('reject');
   $$('.modal-mask').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)closeMask(m.id)})); document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal-mask:not([hidden])').forEach(m=>closeMask(m.id));if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!e.ctrlKey&&!e.metaKey&&['1','2','3'].includes(e.key))goPage(['chat','today','trend'][Number(e.key)-1])});
-  $$('.settings-tabs button').forEach(x=>x.onclick=()=>selectSettingsTab(x.dataset.tab)); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
+  $$('.settings-tabs button').forEach(x=>x.onclick=()=>{selectSettingsTab(x.dataset.tab);if(matchMedia('(max-width:700px)').matches){document.querySelector('#settingsTitle').scrollIntoView({block:'start'});document.querySelector('#settingsTitle').focus({preventScroll:true})}}); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#clearModelKeyBtn').onclick=()=>clearOwnKey('model'); $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};
   $('#testSearchBtn').onclick=testSearch; $('#clearSearchKeyBtn').onclick=clearSearchKey; $('#searchToggle').onchange=toggleSearch;
   $('#todayLogs').addEventListener('click',e=>{const btn=e.target.closest('[data-edit-id]');if(btn)openRecord(btn.dataset.editKind,btn.dataset.editId)});
   $('#toolEditor').addEventListener('input',handleEditorInput);
@@ -567,5 +682,36 @@ function bind() {
   $$('#rangeSwitch button').forEach(x=>x.onclick=()=>{S.range=Number(x.dataset.range);$$('#rangeSwitch button').forEach(b=>b.classList.toggle('active',b===x));renderTrend()});
 }
 
-async function init(){bind();updateDateHeader();await loadState();await loadSessions();if(S.state?.needs_setup)openSettings('profile');}
+async function init(){
+  try {
+    const auth = await api.get('/api/auth/status');
+    if (!auth.user) { location.replace('/auth.html'); return; }
+    S.token = auth.session_token;
+    const account = $('#accountBtn');
+    S.username = auth.user.username;
+    account.addEventListener('click', () => openSettings());
+    $('#logoutConfirm').addEventListener('click', async () => {
+      try {
+        if (streamController) streamController.abort();
+        await api.post('/api/auth/logout', {});
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('fitai-account'); channel.postMessage('changed'); channel.close();
+        }
+        location.replace('/auth.html');
+      } catch(e) { toast(e.message); }
+    });
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('fitai-account');
+      channel.onmessage = () => location.reload();
+    }
+    window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+    window.addEventListener('focus', async () => {
+      try { const current = await api.get('/api/auth/status');
+        if (current.session_token !== S.token) location.reload();
+      } catch(e) { toast(e.message); }
+    });
+    bind();updateDateHeader();await loadState();await loadSessions();
+    if(S.state?.needs_setup)openSettings('profile');
+  } catch(e) { toast(e.message); }
+}
 init();

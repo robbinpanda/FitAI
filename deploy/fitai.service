@@ -1,0 +1,37 @@
+[Unit]
+Description=渐渐飞 account service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fitai
+Group=fitai
+WorkingDirectory=/opt/fitai
+EnvironmentFile=/etc/fitai.env
+ExecStart=/opt/fitai/.venv/bin/python /opt/fitai/production.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+StateDirectory=fitai
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/fitai
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryHigh=900M
+MemoryMax=1200M
+TasksMax=48
+CPUQuota=150%
+LimitNOFILE=2048
+
+[Install]
+WantedBy=multi-user.target

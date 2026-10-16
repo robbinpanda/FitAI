@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-渐渐飞 - 个人减肥助手 · 本地服务端
+拍拍记 - 个人减肥助手 · 本地服务端
 零第三方依赖，仅使用 Python 标准库。
 数据全部存放在本机 data/fitai.db（SQLite），API Key 也只存在本机。
 启动：python server.py
@@ -21,6 +21,10 @@ import urllib.error
 import urllib.request
 import uuid
 import webbrowser
+import contextvars
+import secrets
+import shutil
+import security
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta
@@ -39,15 +43,54 @@ DB_PATH = os.environ.get("FITAI_DB") or os.path.join(DATA_DIR, "fitai.db")
 PORT = int(os.environ.get("FITAI_PORT", "8765"))
 MODEL_TIMEOUT = int(os.environ.get("FITAI_TIMEOUT", "150"))
 JOB_TTL = 900
-JOB_MAX_RUNNING = 3
+JOB_MAX_RUNNING = 2
 JOB_MAX_OUTPUT = 180000
 JOB_HARD_TIMEOUT = MODEL_TIMEOUT + 90
-APP_NAME = "渐渐飞"
+APP_NAME = "拍拍记"
+LEGACY_APP_NAMES = ("简减肥", "渐渐飞", "FitAI")
 APP_VERSION = "2.0"
 SCHEMA_VERSION = 5
 COACH_MAX_IMAGES = 4
 COACH_MAX_IMAGE_BYTES = 12 * 1024 * 1024
 SESSION_TOKEN = uuid.uuid4().hex
+AUTH = None  # Initialized by the local/production entry point, never by an HTTP request.
+AI_SLOTS = threading.BoundedSemaphore(2)
+AI_PATHS = ("/api/agent", "/api/coach", "/api/test_key", "/api/test_vision", "/api/test_search",
+            "/api/analyze_text", "/api/analyze_image", "/api/analyze_exercise")
+# Shared (admin-paid) model budget. Accounts with their own key are not counted.
+SHARED_DAILY = int(os.environ.get("FITAI_SHARED_DAILY", "30"))
+SHARED_GLOBAL_DAILY = int(os.environ.get("FITAI_SHARED_GLOBAL_DAILY", "1500"))
+# Anonymous landing-page photo trial; never stores the image.
+TRIAL_IP_DAILY = int(os.environ.get("FITAI_TRIAL_IP_DAILY", "3"))
+TRIAL_GLOBAL_DAILY = int(os.environ.get("FITAI_TRIAL_DAILY", "200"))
+TRIAL_MAX_IMAGE = 2 * 1024 * 1024
+ACTIVE_JOBS = threading.BoundedSemaphore(2)
+INIT_LOCK = threading.Lock()
+INITIALIZED_USERS = set()
+
+
+def current_db_path():
+    user = security.identity.get()
+    if user:
+        return user["db"]
+    if AUTH is not None:
+        raise ApiError("请先登录", status=401)
+    return DB_PATH
+
+
+def configure_accounts():
+    global AUTH
+    AUTH = security.Accounts(
+        os.environ.get("FITAI_DATA_DIR", DATA_DIR), os.environ.get("FITAI_MODE", "local"),
+        os.environ.get("FITAI_PUBLIC_ORIGIN", ""), int(os.environ.get("FITAI_MAX_USERS", "20")),
+        ssh_preview=os.environ.get("FITAI_SSH_PREVIEW") == "1")
+
+
+def prepare_user(user):
+    with INIT_LOCK:
+        if user["id"] not in INITIALIZED_USERS:
+            init_db()
+            INITIALIZED_USERS.add(user["id"])
 MAX_ITEMS = 40
 MAX_STR = 400
 MAX_NOTE = 140
@@ -87,10 +130,10 @@ def _finite(n):
 
 @contextmanager
 def db():
-    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    parent = os.path.dirname(os.path.abspath(current_db_path()))
     if parent:
         os.makedirs(parent, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn = sqlite3.connect(current_db_path(), timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=15000")
@@ -107,14 +150,14 @@ def db():
 
 def backup_db(reason="manual"):
     """用 SQLite backup API 做一致性备份（WAL 下不能只拷主文件）。"""
-    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    parent = os.path.dirname(os.path.abspath(current_db_path()))
     bdir = os.path.join(parent or DATA_DIR, "backups")
     os.makedirs(bdir, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     dest = os.path.join(bdir, "fitai-%s-%s.db" % (reason, stamp))
-    if not os.path.isfile(DB_PATH):
+    if not os.path.isfile(current_db_path()):
         return dest
-    src = sqlite3.connect(DB_PATH, timeout=15)
+    src = sqlite3.connect(current_db_path(), timeout=15)
     try:
         dst = sqlite3.connect(dest)
         try:
@@ -460,7 +503,7 @@ def claim_op(c, op_id, kind, digest):
 
 
 def photos_dir():
-    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    parent = os.path.dirname(os.path.abspath(current_db_path()))
     d = os.path.join(parent or DATA_DIR, "photos")
     os.makedirs(d, exist_ok=True)
     return d
@@ -1068,7 +1111,7 @@ AGENT_MANAGEMENT_TOOLS = ("update_meal", "update_exercise", "update_weight", "de
 AGENT_READ_TOOLS = ("query_records", "get_day_summary")
 AGENT_TOOLS = ("log_meal", "log_exercise", "log_weight") + AGENT_MANAGEMENT_TOOLS
 
-AGENT_SYSTEM = """你是 渐渐飞，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
+AGENT_SYSTEM = """你是 拍拍记，一个可靠、克制、有同理心的私人减脂 Agent。你既是减脂教练，也能把用户自然语言或图片转换成待确认的健康记录。
 
 【工具调用是任务的一部分】
 不要把工具调用当成可选的补充。每轮先判断用户是在要求执行记录/管理/查询，还是只想咨询；一旦命中下述触发条件，必须在本轮 tool_calls 中返回匹配工具，不能只用 reply 口头答应、复述参数、建议用户手动操作，或让用户再次提醒你调用工具。
@@ -1081,6 +1124,7 @@ AGENT_SYSTEM = """你是 渐渐飞，一个可靠、克制、有同理心的私�
 
 【强制触发条件】
 - 用户明确表示已经吃了/喝了某个具体内容，或明确要求记录具体饮食：必须调用 log_meal。已知食物名称或图片可识别出食物即可生成待确认记录；份量不精确时允许合理估算并降低 confidence。
+- 照片中能识别食物，用户说“我吃了两个”，就是吃了两个该食物；按常见单个可食重量估算并说明假设，直接给待确认卡片，不要再问是否真是两个。“行/对/两颗某食物”等是在承接尚未生成卡片的记录请求。卡片确认才会保存，不需要在聊天里再确认一遍数量。
 - 用户明确表示已经完成某项具体运动，且有时长，或明确要求记录带时长的具体运动：必须调用 log_exercise。缺强度可按中等强度估算；缺运动项目或时长才询问最少缺失信息。
 - 用户报告了具体体重数值或明确要求记录该数值：必须调用 log_weight。没有体重数值时才询问。
 - 用户要求修改、删除、恢复已有记录：必须使用管理工具。最新上下文没有能唯一定位的真实 ID 时，必须先调用 query_records；不得只解释操作方法或口头声称会处理。
@@ -1146,6 +1190,7 @@ AGENT_SYSTEM = """你是 渐渐飞，一个可靠、克制、有同理心的私�
 - log_exercise 的 arguments 包含 date,items；items 每项包含 type,minutes,met,kj,confidence,note。项目和时长必须来自用户，强度未给可明确按估算处理。
 - log_weight 的 arguments 包含 date,weight,note；weight 必须来自用户本次提供或明确指代的称重数值。
 - 不需要工具时 tool_calls 必须是 []。
+- 仅当确实无法识别食物种类、无法确定图片中吃的是哪一种时，可返回 clarification:"food_identity" 并问清食物种类；缺精确克重、营养估算或卡片确认不属于此情况，必须合理估算并生成待确认记录。
 - 每个数值必须是 JSON 数字，不带单位。饮食每项必须有 name, amount, grams, kj, protein, carb, fat；运动每项必须有 type, minutes, met, kj。
 - 日期默认使用上下文中的“当前记录日期”。餐次根据当地时间和用户表达判断，无法判断用“其他”。
 - 回复一般控制在 300 字以内。""" + "\n\n" + ENERGY_KNOWLEDGE
@@ -1154,6 +1199,7 @@ AGENT_SCHEMA = {
     "type": "object",
     "properties": {
         "reply": {"type": "string"},
+        "clarification": {"type": "string", "enum": ["food_identity"]},
         "tool_calls": {
             "type": "array",
             "items": {
@@ -1271,7 +1317,7 @@ NUTRITION_SCHEMA = {
 
 def _read_http_error(e):
     try:
-        return e.read().decode("utf-8", "ignore")
+        return e.read(65536).decode("utf-8", "ignore")
     except Exception:
         return str(e)
 
@@ -1536,8 +1582,13 @@ def _choice_payload(obj):
 def _iter_sse_objects(resp):
     """按行解析 SSE。每条 data: 后面是一个 JSON；data: [DONE] 结束。"""
     buf = b""
+    received = 0
+    started = time.monotonic()
     while True:
         piece = resp.read(8192)
+        received += len(piece)
+        if received > 4 * 1024 * 1024 or time.monotonic() - started > MODEL_TIMEOUT:
+            raise RuntimeError("模型响应超出大小或时间限制")
         if not piece:
             break
         buf += piece.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
@@ -1593,7 +1644,7 @@ def _request_stream(url, api_key, payload, timeout, on_delta=None):
         method="POST",
     )
     try:
-        resp = urllib.request.urlopen(req, timeout=timeout)
+        resp = security.safe_open(req, timeout) if AUTH and AUTH.mode == "server" else urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
         raise RuntimeError(_api_error_message(e)) from e
     except urllib.error.URLError as e:
@@ -1640,7 +1691,10 @@ def _request_stream(url, api_key, payload, timeout, on_delta=None):
                     usage = obj["usage"]
                 take_delta(_choice_payload(obj))
         else:
-            body = resp.read().decode("utf-8", "ignore")
+            body = resp.read(2 * 1024 * 1024 + 1)
+            if len(body) > 2 * 1024 * 1024:
+                raise RuntimeError("模型响应过大")
+            body = body.decode("utf-8", "ignore")
             try:
                 obj = json.loads(body)
             except Exception:
@@ -1673,6 +1727,10 @@ def call_model(base_url, api_key, model, messages, timeout=MODEL_TIMEOUT,
     """
     if not api_key:
         raise RuntimeError("尚未配置 API Key，请在设置里填写。")
+    shared = shared_defaults()
+    if shared.get("api_key") and api_key == shared["api_key"]:
+        if base_url.rstrip("/") != shared["base_url"].rstrip("/") or model != shared["text_model"]:
+            raise ApiError("使用站点默认 API 时不能更换服务地址或模型；请先填写自己的 API Key")
     url = _chat_url(base_url)
     payload = {
         "model": model or "deepseek-chat",
@@ -1686,11 +1744,29 @@ def call_model(base_url, api_key, model, messages, timeout=MODEL_TIMEOUT,
             {"type": "json_object"},
             None,
         ]
+        # DeepSeek supports JSON mode, but rejects response_format=json_schema.
+        # Keep application-side schema validation, without an avoidable 400 per turn.
+        if urllib.parse.urlparse(base_url).hostname == "api.deepseek.com":
+            formats = formats[1:]
     else:
         formats = [None]
 
     last_err = None
     rate_tries = 0
+    uses_shared_key = bool(shared.get("api_key") and api_key == shared["api_key"])
+
+    def public_error(error):
+        if not uses_shared_key:
+            return error
+        # Sanitize only at the user boundary, after compatibility retries.
+        code = re.search(r"\b(400|401|402|403|404|413|415|422|429|500|502|503|504)\b", str(error))
+        status = code[0] if code else ""
+        tip = {
+            "400": "站点默认模型请求参数不兼容（400），请联系管理员",
+            "402": "站点默认模型余额不足（402），请联系管理员",
+            "429": "站点默认模型请求较多（429），请稍后重试",
+        }.get(status, "站点默认模型暂时不可用" + ("（" + status + "）" if status else "") + "，请稍后重试或联系管理员")
+        return RuntimeError(tip)
     # Omission does not disable thinking on providers whose models enable it
     # by default. Explicitly disable it, then fall back to omission for gateways
     # which reject the provider-specific field.
@@ -1724,18 +1800,18 @@ def call_model(base_url, api_key, model, messages, timeout=MODEL_TIMEOUT,
             except RuntimeError as e:
                 last_err = e
                 msg = str(e)
-                if any(x in msg for x in ("401", "403")):
-                    raise
+                if any(x in msg for x in ("401", "402", "403")):
+                    raise public_error(e) from None
                 if "429" in msg:
                     rate_tries += 1
                     if rate_tries > 2:
-                        raise
+                        raise public_error(e) from None
                     time.sleep(min(8, 1.5 * rate_tries))
                     continue
                 if not any(x in msg for x in ("400", "422", "415")):
-                    raise
+                    raise public_error(e) from None
                 continue
-    raise last_err or RuntimeError("模型调用失败")
+    raise public_error(last_err or RuntimeError("模型调用失败")) from None
 
 
 def _loads_json(text):
@@ -2032,9 +2108,54 @@ def get_profile():
         return dict(c.execute("SELECT * FROM profile WHERE id=1").fetchone())
 
 
-def get_settings():
+def stored_settings():
     with db() as c:
         return dict(c.execute("SELECT * FROM settings WHERE id=1").fetchone())
+
+
+def shared_defaults():
+    if not AUTH or AUTH.mode != "server":
+        return {}
+    return {
+        "api_key": os.environ.get("FITAI_SHARED_API_KEY", ""),
+        "base_url": os.environ.get("FITAI_SHARED_BASE_URL", "https://api.deepseek.com/v1"),
+        "text_model": os.environ.get("FITAI_SHARED_MODEL", "deepseek-flash"),
+        "tavily_api_key": os.environ.get("FITAI_SHARED_TAVILY_API_KEY", ""),
+    }
+
+
+def uses_shared_key():
+    return bool(shared_defaults().get("api_key") and not stored_settings().get("api_key"))
+
+
+def _shared_quota_key(uid):
+    return "shared-day:%s:%s" % (uid, date.today().isoformat())
+
+
+def consume_shared_quota(uid):
+    AUTH.limit(_shared_quota_key(uid), SHARED_DAILY, 2 * 86400,
+               "今天的免费 AI 次数（%d 次）已用完，明天自动恢复；也可以在设置里填写自己的 API Key 继续使用" % SHARED_DAILY)
+    AUTH.limit("shared-global:" + date.today().isoformat(), SHARED_GLOBAL_DAILY, 2 * 86400,
+               "今天全站的免费 AI 额度已用完，明天自动恢复；也可以在设置里填写自己的 API Key")
+
+
+def shared_quota():
+    user = security.identity.get()
+    if not user or not AUTH or not uses_shared_key():
+        return None
+    used = AUTH.usage(_shared_quota_key(user["id"]))
+    return {"limit": SHARED_DAILY, "used": used, "remaining": max(0, SHARED_DAILY - used)}
+
+
+def get_settings():
+    s = stored_settings()
+    shared = shared_defaults()
+    if not s.get("api_key") and shared.get("api_key"):
+        for field in ("api_key", "base_url", "text_model"):
+            s[field] = shared[field]
+    if not s.get("tavily_api_key"):
+        s["tavily_api_key"] = shared.get("tavily_api_key", "")
+    return s
 
 
 def _mask_key(k):
@@ -2048,13 +2169,18 @@ def _mask_key(k):
 
 def public_settings():
     s = get_settings()
+    own = stored_settings()
+    shared = shared_defaults()
     mode = s.get("vision_mode") or "inherit"
     if mode not in VISION_MODES:
         mode = "inherit"
     enabled = int(s.get("vision_enabled") or 0) != 0
     return {
         "has_key": bool(s.get("api_key")),
-        "api_key_masked": _mask_key(s.get("api_key")),
+        "api_key_masked": _mask_key(own.get("api_key")),
+        "has_own_key": bool(own.get("api_key")),
+        "has_shared_key": bool(shared.get("api_key")),
+        "key_source": "own" if own.get("api_key") else ("shared" if s.get("api_key") else "none"),
         "base_url": s.get("base_url") or "https://api.deepseek.com/v1",
         "text_model": s.get("text_model") or "deepseek-flash",
         "vision_enabled": enabled,
@@ -2064,8 +2190,12 @@ def public_settings():
         "vision_base_url": s.get("vision_base_url") or "",
         "vision_model": s.get("vision_model") or "",
         "has_tavily_key": bool(s.get("tavily_api_key")),
-        "tavily_api_key_masked": _mask_key(s.get("tavily_api_key")),
+        "tavily_api_key_masked": _mask_key(own.get("tavily_api_key")),
+        "has_own_tavily_key": bool(own.get("tavily_api_key")),
+        "has_shared_tavily_key": bool(shared.get("tavily_api_key")),
+        "tavily_key_source": "own" if own.get("tavily_api_key") else ("shared" if s.get("tavily_api_key") else "none"),
         "search_enabled": bool(s.get("search_enabled")),
+        "shared_quota": shared_quota(),
         "search_ready": bool(s.get("search_enabled") and s.get("tavily_api_key")),
         "privacy": {
             "local_only": "记录保存在本机。",
@@ -2252,7 +2382,6 @@ def day_summary(d):
     # Do not extrapolate a few logged foods into a full-day weight prediction.
     predict_delta = None
     profile_ready = bool(prof.get("completed") or prof.get("updated_at"))
-    has_any_weight = latest_weight() is not None
     return {
         "date": d,
         "weight": wr["display_weight"],
@@ -2284,7 +2413,7 @@ def day_summary(d):
         "macro_targets": macro_targets(wr["calc_weight"], energy["target_intake"]),
         "profile": prof,
         "profile_ready": profile_ready,
-        "needs_setup": not (profile_ready and has_any_weight),
+        "needs_setup": not profile_ready,
         "energy_unit": "kJ",
     }
 
@@ -2414,16 +2543,17 @@ def _apply_key(current, value, action, field):
 
 def save_settings(b, now=None):
     now = now or datetime.now().isoformat(timespec="seconds")
-    s = get_settings()
+    s = stored_settings()
+    shared = shared_defaults()
     s["tavily_api_key"] = _apply_key(s.get("tavily_api_key"), b.get("tavily_api_key"),
                                      b.get("tavily_api_key_action"), "tavily_api_key")
     if "search_enabled" in b:
         if not isinstance(b["search_enabled"], bool):
             raise ApiError("联网搜索开关必须是布尔值", field="search_enabled")
         s["search_enabled"] = int(b["search_enabled"])
-    if b.get("tavily_api_key_action") == "clear":
+    if b.get("tavily_api_key_action") == "clear" and not shared.get("tavily_api_key"):
         s["search_enabled"] = 0
-    if s.get("search_enabled") and not s.get("tavily_api_key"):
+    if s.get("search_enabled") and not (s.get("tavily_api_key") or shared.get("tavily_api_key")):
         raise ApiError("请先填写 Tavily API Key", field="tavily_api_key")
     if "base_url" in b:
         s["base_url"] = clip_str(b.get("base_url") or "https://api.deepseek.com/v1", 300, "base_url")
@@ -2454,6 +2584,9 @@ def save_settings(b, now=None):
             s.get("vision_api_key"), b.get("vision_api_key"),
             b.get("vision_api_key_action"), "vision_api_key",
         )
+    if AUTH and AUTH.mode == "server":
+        security.allowed_url(s["base_url"])
+        security.allowed_url(s["vision_base_url"])
     with db() as c:
         c.execute(
             """UPDATE settings SET api_key=?,base_url=?,text_model=?,vision_enabled=?,
@@ -2560,6 +2693,55 @@ def agent_entry_reply(question, images):
     if text in ("今天记完了", "完成今日记录", "今天的记录完成了", "今天已经记完了"):
         return "好的，已有记录已自动汇总，不需要额外完成步骤。之后也能随时补充、修改或删除。"
     return None
+
+
+def meal_draft_request(question, images, prior=()):
+    """Conservative guard for explicit intake and its unresolved follow-up.
+
+    Prior rows are newest first. Stop at an existing tool, a different topic or
+    a negation: a short acknowledgement must never duplicate an old record.
+    The model still identifies food/estimates portions; this guard creates no data.
+    """
+    def text(value):
+        return re.sub(r"[\s，。！、,.!：:]+", "", value or "")
+
+    def excluded(value):
+        return bool(re.search(r"[?？]|没吃|没喝|没再吃|没再喝|不吃|不喝|不记录|不用记|别记|不要记|不记了|算了|取消|假如|如果|假设|打算|计划|准备|想吃|想喝|明天|后天|能吃|可以吃|能喝|可以喝|吃了吗|喝了吗|热量多少|多少热量|会胖|会不会|怎么办|建议|修改|改成|改为|删|撤销|恢复|查一下", value))
+
+    def explicit(value, has_images):
+        if (excluded(value) or agent_entry_reply(value, []) or
+                re.search(r"比如|例如|举例|他说|她说|(?:他|她|别人|朋友|孩子|宝宝)(?:刚|已经|今天|昨天)?(?:吃|喝)", value)):
+            return False
+        hit = re.search(r"(?:吃了|喝了|吃完了|喝完了|吃的是|喝的是|吃过了|喝过了|帮我记录|帮我记下|记录一下)(.+)", value)
+        if not hit:
+            return False
+        food = hit[1].strip()
+        vague = bool(re.fullmatch(r"(?:[零一二两三四五六七八九十半\d.]+)?(?:个|颗|份|口|碗|杯|块|片|只)?(?:这个|那个|这些|东西|图里的|图片里的|照片里的)?", food))
+        return bool(food and (has_images or not vague))
+
+    current = text(question)
+    if excluded(current):
+        return False
+    if explicit(current, bool(images)):
+        return True
+    # Food/portion clarification is only intake when continuing a recent request.
+    acknowledgement = r"(?:行|好|好的|好呀|嗯|对|对的|是|是的|没错|确认|可以|就这些|就是这些|帮我记吧|记吧)"
+    portion = r"(?:就是|是|就|大概|大约|约)?[零一二两三四五六七八九十半\d.]+(?:个|颗|份|口|碗|杯|块|片|只|克|g|kg|毫升|ml).{0,24}"
+    if not (re.fullmatch(acknowledgement, current) or re.fullmatch(portion, current)):
+        return False
+    for turn in list(prior)[:8]:
+        if turn.get("role") == "assistant":
+            if _json_column(turn.get("tool_calls"), []):
+                return False
+            continue
+        previous = text(turn.get("content"))
+        if excluded(previous):
+            return False
+        if explicit(previous, bool(coach_image_payloads(turn))):
+            return True
+        if not (re.fullmatch(acknowledgement, previous) or re.fullmatch(portion, previous)):
+            return False
+    return False
 
 
 def normalize_agent_tool_call(call, default_date):
@@ -3015,7 +3197,7 @@ def tavily_search(api_key, query):
             return None
     try:
         opener = urllib.request.build_opener(NoRedirect())
-        with opener.open(req, timeout=20) as response:
+        with (security.safe_open(req, 20) if AUTH and AUTH.mode == "server" else opener.open(req, timeout=20)) as response:
             raw = response.read(2 * 1024 * 1024 + 1)
         if len(raw) > 2 * 1024 * 1024:
             raise ValueError("response too large")
@@ -3054,6 +3236,10 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
         schema["properties"]["tool_calls"]["items"]["properties"]["name"]["enum"].append("search_web")
     default_date = settings.get("_record_date") or date.today().isoformat()
     sources, errors, search_count, read_count, quality_retries = [], [], 0, 0, 0
+    draft_required = bool(settings.get("_meal_draft_required"))
+    draft_retries = 0
+    if draft_required:
+        messages[0]["content"] += "\n【本轮记录约束】用户已明确表达摄入或正在补充尚未成卡的饮食记录。本轮必须返回 log_meal 待确认卡片；可估算克重并写明假设，不用先在聊天里确认份量。只有真正无法识别食物种类才可用 clarification:food_identity 提问。"
     search_data = None
     def event(kind, data):
         if on_event:
@@ -3084,6 +3270,8 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
         try:
             payload = extract_json(out.get("content") or "")
         except RuntimeError:
+            if draft_required:
+                raise ApiError("AI 未返回有效的待确认饮食记录，请重试；本次尚未保存饮食", status=502)
             return out, search_data
         calls = payload.get("tool_calls", []) if isinstance(payload, dict) else []
         reads = [x for x in calls if isinstance(x, dict) and x.get("name") in AGENT_READ_TOOLS + ("search_web",)] if isinstance(calls, list) else []
@@ -3097,11 +3285,31 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
                     raise ApiError("品牌食品在生成记录前必须完成联网查询，请重试", status=502)
                 reads = [{"name": "search_web", "arguments": {"query": forced_query}}]
         if not reads:
+            meal_items = list(_agent_log_meal_items(payload))
+            needs_identity = (quality_retries == 0 and isinstance(payload, dict) and payload.get("clarification") == "food_identity"
+                              and not calls and bool(payload.get("reply")))
+            if draft_required and not meal_items and not needs_identity:
+                if phase == 3 or draft_retries >= 2:
+                    raise ApiError("AI 未生成待确认饮食记录，请重试；本次尚未保存饮食", status=502)
+                draft_retries += 1
+                event("reply", {"text": ""})
+                event("status", {"text": "正在整理待确认饮食记录…"})
+                messages.append({"role": "assistant", "content": out["content"]})
+                messages.append({"role": "user", "content":
+                    "程序检查：原始请求是已吃食物或其数量补充，但你没有返回 log_meal。"
+                    "请依据原始请求和图片生成待确认卡片，不能只口头承诺、只报热量或反复确认已给出的数量。"
+                    "不清楚精确克重时按常见可食重量估算，在 note 写明假设、降低 confidence。"
+                    "营养须按实际份量缩放并通过17/17/37一致性校验。不要虚构未识别的食物；"
+                    "只有食物种类确实无法判断时返回 clarification:food_identity 并提出具体问题。"})
+                continue
             issues = _agent_meal_quality_issues(payload)
             if issues:
                 if phase == 3 or quality_retries >= 2:
                     raise ApiError("AI 营养估算未通过一致性校验，请重试", status=502)
                 quality_retries += 1
+                # A failed nutritional estimate must be repaired, not silently
+                # replaced with prose that loses the user's pending meal.
+                draft_required = True
                 event("reply", {"text": ""})
                 event("status", {"text": "正在复核份量与营养数据…"})
                 messages.append({"role": "assistant", "content": out["content"]})
@@ -3109,9 +3317,9 @@ def run_agent_model(base, key, model, messages, settings, on_event=None):
                     "role": "user",
                     "content": "程序质量审查未通过：" + "；".join(issues) +
                                "。请先核对实际入口克重、每100g/每份、熟重/生重和单位，再拆分份量和油/酱；"
-                               "未知营养不能填零，份量无法判断时先追问，不生成该项记录。"
+                               "未知营养不能填零；常见食物只有精确克重未知时，合理估算并注明假设，保留 log_meal 待确认卡片。"
                                "标签值保留来源口径，正确按实际摄入缩放；非标签项使用17/17/37 kJ/g复算，"
-                               "能量与三大营养素差异不得超过20%。不要沿用原来的矛盾数字。",
+                               "能量与三大营养素差异不得超过20%。不要沿用原来的矛盾数字，也不要通过删除工具调用来绕过复核。",
                 })
                 continue
             return out, search_data
@@ -3213,20 +3421,22 @@ def validate_coach_images(value, field="images"):
 
 
 def coach_messages(session_id):
+    rows = []
     with db() as c:
         session = coach_session(c, session_id)
-        rows = rows_to_list(c.execute(
+        cursor = c.execute(
             "SELECT id,role,content,image,images,reasoning,tool_calls,tool_result,search_data,created_at "
-            "FROM coach_messages WHERE session_id=? ORDER BY id", (session_id,)
-        ).fetchall())
-    for row in rows:
-        images = coach_image_payloads(row)
-        row.pop("image")
-        row.pop("images")
-        row["tool_calls"], row["tool_result"] = agent_message_public(row)
-        row["search_data"] = _json_column(row.get("search_data"), None)
-        row["image_urls"] = ["/api/coach/image?id=%d&index=%d" % (row["id"], i)
-                             for i in range(len(images))]
+            "FROM coach_messages WHERE session_id=? ORDER BY id DESC LIMIT 200", (session_id,))
+        for record in cursor:
+            row = dict(record)
+            count = len(coach_image_payloads(row))
+            row.pop("image")
+            row.pop("images")
+            row["tool_calls"], row["tool_result"] = agent_message_public(row)
+            row["search_data"] = _json_column(row.get("search_data"), None)
+            row["image_urls"] = ["/api/coach/image?id=%d&index=%d" % (row["id"], i) for i in range(count)]
+            rows.append(row)
+    rows.reverse()
     return session, rows
 
 
@@ -3326,8 +3536,8 @@ def build_export():
 def apply_import(payload):
     require_object(payload, "备份")
     # Validate the entire backup before creating a snapshot or touching live rows.
-    if payload.get("app") not in (APP_NAME, "FitAI"):
-        raise ApiError("不是带 渐渐飞 标识的备份；旧备份请先确认格式和能量单位", field="app")
+    if payload.get("app") not in (APP_NAME, *LEGACY_APP_NAMES):
+        raise ApiError("不是带 拍拍记 标识的备份；旧备份请先确认格式和能量单位", field="app")
     ver = payload.get("schema_version")
     if not isinstance(ver, int) or isinstance(ver, bool):
         raise ApiError("无法识别的备份版本", field="schema_version")
@@ -3593,8 +3803,153 @@ class ReuseServer(ThreadingHTTPServer):
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def end_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        super().end_headers()
+
+    def _account_api(self, path, method):
+        user = AUTH.session(self.headers)
+        if method == "GET" and path == "/api/auth/status":
+            self._send(200, {"mode": AUTH.mode, "registration_open": AUTH.invite_open(),
+                             "user": {"username": user["username"]} if user else None,
+                             "session_token": user["csrf"] if user else ""})
+            return
+        if method != "POST":
+            raise ApiError("接口不存在", 404)
+        if path == "/api/auth/logout":
+            # Consume the POST body before reusing an HTTP/1.1 connection.
+            self._json_body()
+            if user:
+                if not secrets.compare_digest(self.headers.get("X-FitAI-Token", ""), user["csrf"]):
+                    raise ApiError("会话校验失败", 403)
+                AUTH.revoke(user)
+            self._send(200, {"ok": True}, headers={"Set-Cookie": AUTH.cookie("", clear=True)})
+            return
+        if path not in ("/api/auth/login", "/api/auth/register"):
+            raise ApiError("接口不存在", 404)
+        if self.headers.get("X-FitAI-Auth") != "1":
+            raise ApiError("缺少登录请求标识", 403)
+        body = self._json_body()
+        raw = AUTH.authenticate(body, path.endswith("register"), self._client_ip())
+        if user:
+            AUTH.revoke(user)
+        self._send(200, {"ok": True}, headers={"Set-Cookie": AUTH.cookie(raw)})
+
+    def _client_ip(self):
+        # The production listener is loopback-only; nginx overwrites this header.
+        if AUTH.mode == "server" and not AUTH.ssh_preview:
+            return self.headers.get("X-Real-IP", self.client_address[0])
+        return self.client_address[0]
+
+    def _trial_photo(self, method):
+        if method != "POST":
+            raise ApiError("不支持的请求方法", 405)
+        # Read the body before any rejection so a keep-alive connection stays in sync.
+        image = self._json_body().get("image")
+        if self.headers.get("X-FitAI-Auth") != "1":
+            raise ApiError("缺少请求标识", 403)
+        if (not isinstance(image, str) or len(image) > TRIAL_MAX_IMAGE
+                or not re.fullmatch(r"data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+", image)):
+            raise ApiError("请上传 2 MB 以内的 JPG、PNG 或 WebP 图片", field="image")
+        shared = shared_defaults()
+        if not shared.get("api_key"):
+            raise ApiError("在线体验暂未开放，注册后即可使用", 503)
+        today = date.today().isoformat()
+        AUTH.limit("trial-ip:%s:%s" % (self._client_ip(), today), TRIAL_IP_DAILY, 2 * 86400,
+                   "今天的免费体验次数已用完，注册后可以继续使用")
+        AUTH.limit("trial-global:" + today, TRIAL_GLOBAL_DAILY, 2 * 86400, "今天的在线体验名额已满，明天再来试试")
+        if not AI_SLOTS.acquire(blocking=False):
+            raise ApiError("体验人数较多，请稍后再试", 429)
+        try:
+            out = call_model(
+                shared["base_url"], shared["api_key"], shared["text_model"],
+                [{"role": "system", "content": NUTRITION_SYSTEM},
+                 {"role": "user", "content": [{"type": "image_url", "image_url": {"url": image}},
+                                              {"type": "text", "text": VISION_USER_HINT}]}],
+                timeout=min(60, MODEL_TIMEOUT), json_schema=NUTRITION_SCHEMA, want_reasoning=False)
+        except (RuntimeError, security.SecurityError) as e:
+            raise ApiError("识别服务暂时不可用，请稍后再试", status=502) from e
+        finally:
+            AI_SLOTS.release()
+        data, _ = _parse_nutrition_reply(out)
+        items = _normalize_items((data or {}).get("items"))
+        if not items:
+            raise ApiError("没有识别出食物，请换一张清晰的餐食照片", status=422)
+        items, _ = _ground_items(items)
+        kcal = lambda kj: round(float(kj or 0) / KJ_PER_KCAL)
+        self._send(200, {
+            "ok": True,
+            "items": [{"name": it["name"], "amount": it.get("amount") or "", "kcal": kcal(it.get("kcal")),
+                       "protein": it.get("protein", 0), "carb": it.get("carb", 0), "fat": it.get("fat", 0)}
+                      for it in items[:12]],
+            "total": dict(_sum_items(items), kcal=kcal(_sum_items(items)["kcal"])),
+            "remaining": max(0, TRIAL_IP_DAILY - AUTH.usage("trial-ip:%s:%s" % (self._client_ip(), today))),
+        })
+
+    def _dispatch(self, method):
+        if AUTH is None:  # Direct legacy test harness; real entry points always enable accounts.
+            return self._do_GET() if method == "GET" else self._do_POST()
+        context = security.identity.set(None)
+        locked = None
+        ai_acquired = False
+        try:
+            AUTH.check_origin(self.headers)
+            path = urlparse(self.path).path
+            if path.startswith("/api/auth/"):
+                return self._account_api(path, method)
+            if path == "/api/trial/photo":
+                return self._trial_photo(method)
+            if path.startswith("/api/") and path != "/api/health":
+                user = AUTH.session(self.headers)
+                if not user:
+                    raise ApiError("请先登录", 401)
+                security.identity.set(user)
+                AUTH.limit("api:" + user["id"], 240, 60)
+                if method == "POST":
+                    self._write_guard()
+                locked = AUTH.lock(user["id"])
+                if not locked.acquire(timeout=2):
+                    locked = None
+                    raise ApiError("当前账号有请求正在处理，请稍后重试", 429)
+                prepare_user(user)
+                if method == "POST" and path in AI_PATHS:
+                    AUTH.limit("ai:" + user["id"], 12, 60)
+                    if uses_shared_key():
+                        consume_shared_quota(user["id"])
+                    ai_acquired = AI_SLOTS.acquire(blocking=False)
+                    if not ai_acquired:
+                        raise ApiError("AI 服务繁忙，请稍后再试", 429)
+                if method == "POST" and not any(x in path for x in ("delete", "cancel")):
+                    root = os.path.dirname(user["db"])
+                    used = sum(os.path.getsize(os.path.join(base, name)) for base, _, names in os.walk(root) for name in names)
+                    if used > int(os.environ.get("FITAI_USER_QUOTA_MB", "512")) * 1024 * 1024:
+                        raise ApiError("账号存储额度已满，请导出数据并联系管理员", 413)
+                    if shutil.disk_usage(root).free < 512 * 1024 * 1024:
+                        raise ApiError("服务器磁盘空间不足，请联系管理员", 507)
+            return self._do_GET() if method == "GET" else self._do_POST()
+        except Exception as e:
+            # An early rejection may leave the request body unread; don't reuse the connection.
+            self.close_connection = True
+            self._send_err(e)
+        finally:
+            if ai_acquired:
+                AI_SLOTS.release()
+            if locked:
+                locked.release()
+            security.identity.reset(context)
+
+    def do_GET(self):
+        self._dispatch("GET")
+
+    def do_POST(self):
+        self._dispatch("POST")
+
     def log_message(self, fmt, *args):
-        sys.stderr.write("[fitai] %s - %s\n" % (self.address_string(), fmt % args))
+        message = re.sub(r"[\x00-\x1f\x7f]", "?", fmt % args)
+        sys.stderr.write("[fitai] %s - %s\n" % (self.address_string(), message))
 
     # ---- helpers
     def _start_agent_stream(self):
@@ -3624,8 +3979,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        if code == 200 and obj is not None and isinstance(obj, dict) and "session_token" in obj:
+        if "Cache-Control" not in (headers or {}):
+            self.send_header("Cache-Control", "no-store")
+        if getattr(self, "close_connection", False) and getattr(self, "request_version", "") == "HTTP/1.1":
+            self.send_header("Connection", "close")
+        if AUTH is None and code == 200 and obj is not None and isinstance(obj, dict) and "session_token" in obj:
             self.send_header(
                 "Set-Cookie",
                 "fitai_token=%s; Path=/; HttpOnly; SameSite=Strict" % SESSION_TOKEN,
@@ -3642,11 +4000,11 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(e, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
             self.close_connection = True
             return
-        if isinstance(e, ApiError):
+        if isinstance(e, (ApiError, security.SecurityError)):
             body = {"error": str(e), "ok": False}
-            if e.field:
+            if getattr(e, "field", None):
                 body["field"] = e.field
-            body.update(e.extra)
+            body.update(getattr(e, "extra", {}))
             self._send(e.status, body)
             return
         log_id = uuid.uuid4().hex[:8]
@@ -3654,11 +4012,22 @@ class Handler(BaseHTTPRequestHandler):
         self._send(500, {"error": "服务器内部错误", "ok": False, "log_id": log_id})
 
     def _json_body(self):
-        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise ApiError("Content-Length 无效")
+        if n < 0 or self.headers.get("Transfer-Encoding"):
+            raise ApiError("不支持的请求长度", 400)
         if n == 0:
             return {}
         path = urlparse(self.path).path
         limit = 100 * 1024 * 1024 if path == "/api/import" else (24 * 1024 * 1024 if path in ("/api/coach", "/api/agent") else 12 * 1024 * 1024)
+        if path.startswith("/api/auth/"):
+            limit = 4096
+        elif path == "/api/trial/photo":
+            limit = TRIAL_MAX_IMAGE + 1024
+        elif AUTH and AUTH.mode == "server":
+            limit = 8 * 1024 * 1024
         if n > limit:
             raise ApiError("请求过大", status=413)
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -3689,6 +4058,14 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _write_guard(self):
+        if AUTH is not None:
+            AUTH.check_origin(self.headers)
+            user = security.identity.get()
+            if not user:
+                raise ApiError("请先登录", 401)
+            if not secrets.compare_digest(self.headers.get("X-FitAI-Token", ""), user["csrf"]):
+                raise ApiError("会话校验失败，请刷新页面", 403)
+            return
         if not self._origin_ok():
             raise ApiError("拒绝来自非本机的写入请求", status=403)
         token = (self.headers.get("X-FitAI-Token") or "").strip()
@@ -3702,7 +4079,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError("缺少本机会话令牌，请刷新页面后再试", status=403)
 
     # ---- GET
-    def do_GET(self):
+    def _do_GET(self):
         u = urlparse(self.path)
         p = u.path
 
@@ -3717,7 +4094,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(204, raw=b"", ctype="image/x-icon")
             return
         if p == "/":
-            p = "/index.html"
+            p = "/landing.html"
         rel = p.replace("\\", "/").lstrip("/")
         fpath = os.path.abspath(os.path.normpath(os.path.join(STATIC_DIR, rel)))
         root = os.path.abspath(STATIC_DIR)
@@ -3731,9 +4108,12 @@ class Handler(BaseHTTPRequestHandler):
         ext = os.path.splitext(fpath)[1].lower()
         ctype = {".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8",
                  ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
-                 ".ico": "image/x-icon"}.get(ext, "application/octet-stream")
+                 ".webp": "image/webp", ".jpg": "image/jpeg", ".ico": "image/x-icon",
+                 ".webmanifest": "application/manifest+json"}.get(ext, "application/octet-stream")
+        # Images never change in place (new name per revision); let browsers cache them.
+        cache = {"Cache-Control": "public, max-age=2592000"} if ext in (".webp", ".jpg", ".png", ".svg") else None
         with open(fpath, "rb") as f:
-            self._send(200, raw=f.read(), ctype=ctype)
+            self._send(200, raw=f.read(), ctype=ctype, headers=cache)
 
     def _api_get(self, p, u):
         qs = parse_qs(u.query)
@@ -3781,7 +4161,7 @@ class Handler(BaseHTTPRequestHandler):
                 "has_key": s["has_key"],
                 "needs_setup": summ.get("needs_setup", False),
                 "display_unit": display_unit(),
-                "session_token": SESSION_TOKEN,
+                "session_token": security.identity.get()["csrf"] if AUTH else SESSION_TOKEN,
                 "energy_unit": "kJ",
                 "app": APP_NAME,
                 "version": APP_VERSION,
@@ -3807,6 +4187,14 @@ class Handler(BaseHTTPRequestHandler):
                 ).fetchall())
             self._send(200, {"from": src, "items": [meal_public(m) for m in meals]})
         elif p == "/api/export":
+            if AUTH and AUTH.mode == "server":
+                root = os.path.dirname(current_db_path())
+                # JSON export materializes image data. Refuse large exports on 2 GB hosts;
+                # administrator filesystem backups remain available at any size.
+                total = sum(os.path.getsize(os.path.join(base, name)) for base, _, names in os.walk(root)
+                            if os.path.basename(base) != "backups" for name in names)
+                if total > 16 * 1024 * 1024:
+                    raise ApiError("数据超过在线导出上限，请联系管理员进行离线备份", 413)
             self._send(200, build_export())
         elif p == "/api/photo":
             try:
@@ -3829,7 +4217,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "unknown api", "ok": False})
 
     # ---- POST
-    def do_POST(self):
+    def _do_POST(self):
         p = urlparse(self.path).path
         try:
             self._write_guard()
@@ -4138,6 +4526,7 @@ class Handler(BaseHTTPRequestHandler):
 
             settings = get_settings()
             settings["_record_date"] = d
+            settings["_meal_draft_required"] = meal_draft_request(question, images, prior)
             if images and not settings.get("vision_enabled"):
                 raise ApiError("请先在设置中启用视觉模型", field="images")
             if images and settings.get("vision_mode") == "custom":
@@ -4154,6 +4543,9 @@ class Handler(BaseHTTPRequestHandler):
             ctx = agent_context(d, summ, hist, question)
             ctx["本轮输入意图"] = {"meal": "准备记录饮食；内容以本次输入为准", "exercise": "准备记录运动；内容以本次输入为准", "weight": "准备记录体重；数值以本次输入为准"}.get(recording_intent, "普通对话；按用户实际语义判断")
             messages = [{"role": "system", "content": AGENT_SYSTEM}]
+            # Carry at most the latest relevant image turn into an unresolved
+            # meal follow-up, so short quantity answers do not lose visual context.
+            image_turn_id = next((turn["id"] for turn in prior if turn["role"] == "user" and coach_image_payloads(turn)), None)
             for turn in reversed(prior):
                 content = turn.get("content") or ""
                 previous_images = coach_image_payloads(turn)
@@ -4170,6 +4562,11 @@ class Handler(BaseHTTPRequestHandler):
                 sources = _json_column(turn.get("search_data"), None)
                 if sources:
                     content += "\n[此前联网参考来源（非本轮检索）：" + json.dumps(sources, ensure_ascii=False) + "]"
+                if (not images and settings["_meal_draft_required"] and settings.get("vision_enabled")
+                        and (not meal_draft_request(question, images) or re.search(r"图|这个|那个|这些|那些", question))
+                        and turn["id"] == image_turn_id and settings.get("vision_mode") != "custom"):
+                    content = [{"type": "text", "text": content}] + [
+                        {"type": "image_url", "image_url": {"url": img}} for img in previous_images]
                 messages.append({"role": turn["role"], "content": content})
             prompt = "这是本轮最新的用户数据与请求（JSON）：\n" + json.dumps(ctx, ensure_ascii=False)
             if images:
@@ -4897,10 +5294,18 @@ def _job_new(kind="food"):
     now = time.time()
     _job_cleanup(now)
     with JOBS_LOCK:
+        if len(JOBS) >= 128:
+            completed = sorted((k for k, v in JOBS.items() if v.get("status") != "running"),
+                               key=lambda k: JOBS[k]["ts"])
+            for key in completed[:max(1, len(JOBS) - 127)]:
+                JOBS.pop(key, None)
+            if len(JOBS) >= 128:
+                raise ApiError("任务队列已满", 429)
         JOBS[jid] = {
             "id": jid, "status": "running", "kind": kind,
             "reasoning": "", "content": "", "result": None, "error": None,
             "ts": now, "started": now, "cancel": False,
+            "owner": (security.identity.get() or {}).get("id"),
         }
     return jid
 
@@ -4908,9 +5313,22 @@ def _job_new(kind="food"):
 def submit_job(kind, fn, *args):
     if _running_job_count() >= JOB_MAX_RUNNING:
         raise ApiError("已有太多识别任务在进行，请稍后再试", status=429)
-    jid = _job_new(kind)
-    JOB_POOL.submit(_job_runner, jid, fn, args)
-    return jid
+    if not ACTIVE_JOBS.acquire(blocking=False):
+        raise ApiError("已有太多识别任务在进行，请稍后再试", status=429)
+    acquired = AI_SLOTS.acquire(blocking=False)
+    if not acquired:
+        ACTIVE_JOBS.release()
+        raise ApiError("AI 服务繁忙，请稍后再试", 429)
+    try:
+        if AUTH:
+            AUTH.limit("ai:" + security.identity.get()["id"], 12, 60)
+        jid = _job_new(kind)
+        JOB_POOL.submit(contextvars.copy_context().run, _job_runner, jid, fn, args)
+        return jid
+    except Exception:
+        ACTIVE_JOBS.release()
+        AI_SLOTS.release()
+        raise
 
 
 def _job_runner(jid, fn, args):
@@ -4918,12 +5336,15 @@ def _job_runner(jid, fn, args):
         fn(jid, *args)
     except Exception as e:
         _job_finish(jid, error=str(e)[:400])
+    finally:
+        ACTIVE_JOBS.release()
+        AI_SLOTS.release()
 
 
 def _job_cancel(jid):
     with JOBS_LOCK:
         j = JOBS.get(jid)
-        if not j:
+        if not j or (AUTH and j.get("owner") != (security.identity.get() or {}).get("id")):
             return
         j["cancel"] = True
         if j.get("status") == "running":
@@ -4971,7 +5392,7 @@ def _job_snapshot(jid):
     _job_cleanup()
     with JOBS_LOCK:
         j = JOBS.get(jid)
-        if not j:
+        if not j or (AUTH and j.get("owner") != (security.identity.get() or {}).get("id")):
             return None
         return {k: j.get(k) for k in ("id", "status", "kind", "reasoning", "content", "result", "error")}
 
@@ -5292,25 +5713,27 @@ def _run_exercise_job(jid, text, etype, minutes, date, force_local=False):
 
 
 def _probe_port(p, timeout=1.5):
-    """只有真正的 渐渐飞 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
+    """只有真正的 拍拍记 /api/health 才算已启动。其他 HTTP 服务占用时继续找端口。"""
     url = "http://127.0.0.1:%d/api/health" % p
     try:
         resp = urllib.request.urlopen(url, timeout=timeout)
         raw = resp.read().decode("utf-8", "ignore")
         obj = json.loads(raw)
-        return bool(obj.get("ok") and obj.get("app") in (APP_NAME, "FitAI"))
+        return bool(obj.get("ok") and obj.get("app") in (APP_NAME, *LEGACY_APP_NAMES))
     except Exception:
         return False
 
 
 def main():
-    init_db()
+    configure_accounts()
+    if AUTH.mode == "server":
+        raise SystemExit("服务器模式请使用 python production.py；禁止公网运行开发服务器")
     # 已有实例在跑就直接复用：ReuseServer 允许重复绑定同一端口，
     # 不先探测的话会起出多个进程抢同一个端口，导致请求随机分发。
     for p in range(PORT, PORT + 12):
         if _probe_port(p):
             url = "http://127.0.0.1:%d" % p
-            print("渐渐飞 已在运行：%s（未重复启动）" % url)
+            print("拍拍记 已在运行：%s（未重复启动）" % url)
             if "--no-browser" not in sys.argv:
                 webbrowser.open(url)
             return
@@ -5330,7 +5753,7 @@ def main():
         sys.exit(1)
     url = "http://127.0.0.1:%d" % bound
     print("=" * 52)
-    print("  渐渐飞 减肥助手已启动")
+    print("  拍拍记 减肥助手已启动")
     print("  地址：%s" % url)
     print("  数据：%s" % DB_PATH)
     print("  关闭窗口即停止服务")

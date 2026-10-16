@@ -19,5 +19,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Generated release archives
+# Deployment credentials, exports and release archives
+*.pem
+*.key
 *.tar.gz
+/legacy-export.json

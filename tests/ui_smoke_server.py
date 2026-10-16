@@ -10,11 +10,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import server
+import security
 
 
 def main():
     with tempfile.TemporaryDirectory(prefix="fitai-ui-qa-") as folder:
-        server.DB_PATH = str(Path(folder) / "qa.db")
+        server.AUTH = security.Accounts(folder)
+        raw = server.AUTH.authenticate({"username":"qa_user","password":"qa-password-12345"}, True, "127.0.0.1")
+        user = server.AUTH.session({"Cookie":"fitai_session=" + raw})
+        security.identity.set(user)
+        server.DB_PATH = user["db"]
         server.init_db()
         server.save_profile({"completed": True})
         if "--demo-stream" in sys.argv:
@@ -41,6 +46,19 @@ def main():
                 for days, weight in [(13,71.2),(11,70.8),(8,71.0),(6,70.5),(3,70.3),(1,70.1)]:
                     d = (server.date.today()-server.timedelta(days=days)).isoformat()
                     c.execute("INSERT INTO weights(date,weight,note) VALUES(?,?,?)", (d,weight,"Synthetic trend QA"))
+        print("QA login: qa_user / qa-password-12345 (temporary test account only)", flush=True)
+        if "--production" in sys.argv:
+            from waitress import create_server
+            from production import application
+            http = create_server(application, host="127.0.0.1", port=0, threads=6)
+            print("UI_QA_URL=http://127.0.0.1:%s/" % http.effective_port, flush=True)
+            try:
+                http.run()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                http.close()
+            return
         http = server.ReuseServer(("127.0.0.1", 0), server.Handler)
         print("UI_QA_URL=http://127.0.0.1:%d/" % http.server_address[1], flush=True)
         try:
