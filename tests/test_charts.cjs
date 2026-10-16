@@ -50,7 +50,7 @@ test('shared energy chart retains current unit and handles zero intake',()=>{
 test('tooltip displays the real value and remains inside the chart edges',()=>{
   const nodes={};
   for(const name of ['.chart-tooltip','.chart-guide','.chart-active'])nodes[name]={style:{},offsetWidth:190,offsetHeight:36,setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}};
-  nodes.svg={getBoundingClientRect:()=>({left:20,top:10,width:300,height:210})};
+  nodes.svg={viewBox:{baseVal:{width:480,height:250}},getBoundingClientRect:()=>({left:20,top:10,width:300,height:210})};
   const root={clientWidth:300,clientHeight:210,querySelector:s=>nodes[s],getBoundingClientRect:()=>({left:20,top:10})};
   context.root=root;
   for(const x of [64,456]){

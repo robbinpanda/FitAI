@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname,'../static/app.js'),'utf8').r
 const html = fs.readFileSync(path.join(__dirname,'../static/index.html'),'utf8');
 function chat() {
   const elements = {};
-  const document = {querySelector(selector) { return elements[selector] ||= {value:'',hidden:true,textContent:'',innerHTML:'',style:{},scrollHeight:40,focus(){this.focused=true}}; }};
+  const document = {getElementById(id){return this.querySelector('#'+id)},querySelector(selector) { return elements[selector] ||= {value:'',hidden:true,textContent:'',innerHTML:'',style:{},scrollHeight:40,getBoundingClientRect(){return {width:300,height:210}},focus(){this.focused=true}}; }};
   const context = vm.createContext({console,Date,URL,document,AbortController});
   vm.runInContext(source, context);
   vm.runInContext(`goPage=page=>S.page=page;toast=text=>testToast=text;`, context);

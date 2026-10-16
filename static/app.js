@@ -95,11 +95,34 @@ function setBusy(on) {
   if (on) { $('#typing em').textContent = '正在理解你的输入…'; followChat = true; scrollChat(); }
 }
 let modalReturnFocus = null;
+function bindModalViewport() {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  const sync = () => {
+    // Pinch zoom should retain native panning, not resize the dialog again.
+    if (Math.abs(viewport.scale - 1) > 0.01) return;
+    document.documentElement.style.setProperty('--visual-viewport-height', `${viewport.height}px`);
+    document.documentElement.style.setProperty('--visual-viewport-top', `${viewport.offsetTop}px`);
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      const content = active?.closest('.tool-modal-content');
+      if (!content || active === content) return;
+      const field = active.getBoundingClientRect(), area = content.getBoundingClientRect();
+      if (field.bottom > area.bottom) content.scrollTop += field.bottom - area.bottom + 12;
+      else if (field.top < area.top) content.scrollTop -= area.top - field.top + 12;
+    });
+  };
+  viewport.addEventListener('resize', sync, {passive:true});
+  viewport.addEventListener('scroll', sync, {passive:true});
+  sync();
+}
 function openMask(id) {
   modalReturnFocus = document.activeElement;
   const el = document.getElementById(id); el.hidden = false; document.body.classList.add('modal-open');
   $('.app-shell').inert = true; $('.mobile-nav').inert = true;
-  el.querySelector('button,input,select,textarea')?.focus();
+  const content = el.querySelector('.tool-modal-content');
+  if (content) content.scrollTop = 0;
+  el.querySelector('button,input,select,textarea')?.focus({preventScroll:true});
 }
 function closeMask(id) {
   const el = document.getElementById(id); el.hidden = true; document.body.classList.remove('modal-open');
@@ -193,8 +216,9 @@ function renderToday() {
   $('#todayLogs').innerHTML = logs.length ? logs.join('') : '<div class="empty-state">今天还没有记录<br>在对话里说“我吃了…”或“我运动了…”即可开始</div>';
 }
 
-function chartFrame(points, type) {
-  const W = 480, H = 250, L = 64, R = 24, T = 28, B = 48, innerW = W - L - R, innerH = H - T - B;
+function chartFrame(points, type, size = {}) {
+  const W = Math.max(200, size.width || 480), H = Math.max(180, size.height || 250);
+  const L = 64, R = 24, T = 28, B = 48, innerW = W - L - R, innerH = H - T - B;
   const valid = points.map((p,i) => ({...p,i})).filter(p => Number.isFinite(p.value));
   if (!valid.length) return '<div class="empty-state">还没有足够的数据</div>';
   const valueUnit = type === 'line' ? 'kg' : unit();
@@ -222,7 +246,7 @@ function chartFrame(points, type) {
     const right = i < valid.length-1 ? (x(p.i)+x(valid[i+1].i))/2 : W-R;
     return `<g class="chart-hit" role="button" tabindex="0" aria-label="${esc(p.date)}，${round(p.value,1)} ${esc(valueUnit)}" data-chart-date="${esc(p.date)}" data-chart-value="${round(p.value,1)}" data-chart-unit="${esc(valueUnit)}" data-chart-x="${x(p.i)}" data-chart-y="${y(p.value)}"><rect x="${left}" y="${T}" width="${right-left}" height="${innerH}"/></g>`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="group" aria-label="${type==='line'?'体重':'已记录能量摄入'}趋势，横轴日期，纵轴${esc(valueUnit)}。悬停、点击或使用方向键查看记录。">${grids}${axes}${marks}${labels}<line class="chart-guide" y1="${T}" y2="${H-B}" hidden/><circle class="chart-active" r="6" hidden/>${hits}</svg><div class="chart-tooltip" role="status" hidden></div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${type==='line'?'体重':'已记录能量摄入'}趋势，横轴日期，纵轴${esc(valueUnit)}。悬停、点击或使用方向键查看记录。">${grids}${axes}${marks}${labels}<line class="chart-guide" y1="${T}" y2="${H-B}" hidden/><circle class="chart-active" r="6" hidden/>${hits}</svg><div class="chart-tooltip" role="status" hidden></div>`;
 }
 
 function showChartPoint(chart, point) {
@@ -235,7 +259,9 @@ function showChartPoint(chart, point) {
   guide.setAttribute('x1',x); guide.setAttribute('x2',x); guide.hidden = false; guide.removeAttribute('hidden');
   dot.setAttribute('cx',x); dot.setAttribute('cy',y); dot.removeAttribute('hidden');
   const box = svg.getBoundingClientRect(), parent = chart.getBoundingClientRect();
-  const px = box.left-parent.left+x/480*box.width, py = box.top-parent.top+y/250*box.height;
+  const view = svg.viewBox.baseVal, scale = Math.min(box.width/view.width, box.height/view.height);
+  const px = box.left-parent.left+(box.width-view.width*scale)/2+x*scale;
+  const py = box.top-parent.top+(box.height-view.height*scale)/2+y*scale;
   tooltip.style.left = `${Math.max(0,Math.min(chart.clientWidth-tooltip.offsetWidth,px-tooltip.offsetWidth/2))}px`;
   tooltip.style.top = `${Math.max(0,Math.min(chart.clientHeight-tooltip.offsetHeight,py > tooltip.offsetHeight+14 ? py-tooltip.offsetHeight-12 : py+14))}px`;
 }
@@ -259,6 +285,25 @@ function bindChart(chart) {
   });
 }
 
+function renderTrendCharts() {
+  const rows = (S.history || []).slice(-S.range);
+  for (const [id,type] of [['weightChart','line'],['intakeChart','bar']]) {
+    const chart = document.getElementById(id);
+    const points = rows.map(r => ({date:r.date,value:type === 'line'
+      ? r.weight_source === 'measured' && r.weight != null ? num(r.weight,NaN) : null
+      : r.has_meals ? energy(r.intake,1) : null}));
+    const box = chart.getBoundingClientRect();
+    chart.innerHTML = chartFrame(points,type,{width:box.width,height:box.height});
+  }
+  $('#chartUnit').textContent = unit();
+}
+function bindChartResize() {
+  const redraw = () => { if (S.page === 'trend') renderTrendCharts(); };
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(redraw);
+    for (const id of ['weightChart','intakeChart']) observer.observe(document.getElementById(id));
+  } else window.addEventListener('resize',redraw,{passive:true});
+}
 function renderTrend() {
   const rows = (S.history || []).slice(-S.range); if (!rows.length) return;
   const measured = rows.filter(r => r.weight_source === 'measured' && r.weight != null); const logged = rows.filter(r => r.has_meals);
@@ -272,8 +317,7 @@ function renderTrend() {
     ['日均运动', energyText(avgExercise), `近 ${rows.length} 个自然日`]
   ];
   $('#trendKpis').innerHTML = cards.map(c => `<article class="trend-kpi panel"><span>${c[0]}</span><strong>${c[1]}</strong><small>${c[2]}</small></article>`).join('');
-  $('#weightChart').innerHTML = chartFrame(rows.map(r => ({ date:r.date, value:r.weight_source === 'measured' && r.weight != null ? num(r.weight,NaN) : null })), 'line');
-  $('#intakeChart').innerHTML = chartFrame(rows.map(r => ({ date:r.date, value:r.has_meals ? energy(r.intake,1) : null })), 'bar'); $('#chartUnit').textContent = unit();
+  renderTrendCharts();
   $('#dayDots').innerHTML = rows.map(r => `<div class="day-dot"><i class="${r.has_meals ? 'logged' : ''}" title="${esc(r.date)} · ${statusText(r.meal_status)}"></i><small>${r.date.slice(8)}</small></div>`).join('');
 }
 
@@ -594,11 +638,13 @@ async function exportData(){try{const data=await api.get('/api/export');const bl
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
+  bindModalViewport();
   bindChart($('#weightChart')); bindChart($('#intakeChart'));
+  bindChartResize();
   document.addEventListener('keydown',event=>{
     const mask=$('.modal-mask:not([hidden])');
     if(!mask||event.key!=='Tab')return;
-    const controls=$$('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]',mask).filter(el=>el.getClientRects().length);
+    const controls=$$('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]',mask).filter(el=>el.getClientRects().length);
     const first=controls[0],last=controls.at(-1);
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}

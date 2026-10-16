@@ -67,7 +67,23 @@ button:disabled{cursor:default}
 .text-button,.record-edit{font-size:12px;min-height:36px}
 .tool-card-head b{font-size:14px}.tool-card-head small,.tool-state{font-size:11px}.tool-line{font-size:13px;line-height:1.6}
 .tool-card-actions button{height:40px;font-size:12px}.tool-card-head{padding:15px 16px}.tool-lines{padding:14px 16px}
-.tool-modal .modal-actions{position:sticky;bottom:-28px;padding:16px 0;margin-bottom:-12px;background:var(--paper);border-top:1px solid var(--line);z-index:2}
+/* Safari's expanded address bar must fit even before visualViewport updates.
+   svh reserves browser chrome; safe-area-inset only reserves device safe areas. */
+:root{--modal-safe-height:100vh}
+@supports(height:100svh){:root{--modal-safe-height:100svh}}
+.modal-mask{inset:var(--visual-viewport-top,0px) 0 auto;height:100vh;height:min(var(--visual-viewport-height,100dvh),var(--modal-safe-height));min-height:0;grid-template-rows:minmax(0,1fr);padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));overscroll-behavior:contain;background:none;backdrop-filter:none}
+/* Keep the backdrop covering the screen when the address bar is collapsed. */
+.modal-mask::before{content:'';position:fixed;inset:0;background:rgba(36,31,28,.38);backdrop-filter:blur(8px);z-index:-1;pointer-events:none}
+.modal-mask .modal{min-height:0;max-height:100%;overscroll-behavior:contain}
+.modal-mask .tool-modal{display:flex;flex-direction:column;max-height:min(760px,100%);padding:0;overflow:hidden}
+.tool-modal-content{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding:28px;scroll-padding-block:24px;scrollbar-width:thin}
+.tool-modal .modal-close{z-index:3;background:var(--paper);width:44px;height:44px;right:12px;top:10px}
+.tool-modal .modal-actions{position:relative;flex:none;flex-wrap:wrap;gap:9px;margin:0;padding:16px 28px;background:var(--paper);border-top:1px solid var(--line);z-index:2}
+.tool-modal .modal-actions button{min-height:44px}
+.tool-editor,.editor-item,.editor-field,.nutrient-grid label{min-width:0}
+.editor-item-head{gap:8px;overflow-wrap:anywhere}
+.page,.message-scroll{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.composer-wrap{flex-shrink:0}
 .modal-lead{font-size:13px;line-height:1.8}.editor-item-head b{font-size:14px}.editor-item-head small{font-size:11px}
 .estimate-note{font-size:12px;line-height:1.75;color:#80684c;background:#faf3e8;padding:10px 12px;border-radius:9px;margin:0 0 12px;overflow-wrap:anywhere}
 .editor-field span,.nutrient-grid label span,.form-grid label>span{font-size:12px}
@@ -80,15 +96,20 @@ button:disabled{cursor:default}
   .welcome{margin-top:16px}.welcome h2{font-size:30px}.agent-orb{width:50px;height:50px;border-radius:17px;margin-bottom:12px}
   .prompt-grid{margin-top:20px}.prompt-card{padding:10px 12px}.prompt-card small{white-space:normal}
   .composer-shortcuts>span{display:none}.composer-wrap{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
-  .composer textarea,.form-grid input,.editor-field input,.nutrient-grid input{font-size:16px}
+  .composer textarea,.form-grid input,.editor-field input,.editor-field select,.nutrient-grid input{font-size:16px}
   .message-body{max-width:90%}.message-text{font-size:15px}.message{gap:9px}
-  .tool-modal .modal-actions{bottom:-23px}.mini-card{padding:16px;min-height:128px}
+  .modal-mask{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+  .tool-modal-content{padding:23px 18px}
+  .tool-modal .modal-actions{padding:12px 18px}
+  .mini-card{padding:16px;min-height:128px}
   .setup-hint,.chat-error{font-size:12px;padding:10px}
   .mobile-nav{height:calc(68px + env(safe-area-inset-bottom))}.mobile-nav button{font-size:11px}
   .section-intro{flex-wrap:wrap}.today-logs{max-height:none}
 }
 @media(max-width:390px){.mini-grid,.trend-kpis{grid-template-columns:1fr 1fr}.mini-card{padding:14px}.mini-card strong{font-size:22px;overflow-wrap:anywhere}.mini-card small{font-size:11px}}
+.chart-card,.chart{min-width:0}
 .chart{position:relative}
+.chart svg{display:block}
 .chart .axis-label{font-size:13px;font-variant-numeric:tabular-nums;fill:#756e66}
 .chart .axis-title{font-size:12px;fill:#756e66}
 .chart-axis{fill:none;stroke:#c9bfb5;stroke-width:1}
@@ -99,4 +120,3 @@ button:disabled{cursor:default}
 .chart-guide{stroke:var(--accent);stroke-width:1;stroke-dasharray:4 4;pointer-events:none}
 .chart-active{fill:var(--accent);stroke:var(--paper);stroke-width:2;pointer-events:none}
 .chart-tooltip{position:absolute;z-index:3;padding:9px 12px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;line-height:1.5;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow-sm);font-variant-numeric:tabular-nums}
-@media(max-width:1100px){.chart .axis-label{font-size:17px}.chart .axis-title{font-size:15px}}
