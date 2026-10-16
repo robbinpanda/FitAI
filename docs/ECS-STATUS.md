@@ -98,3 +98,23 @@ ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18765:127.0.0.1:8765 fitai-serve
 根路径 `/` 现为渐渐飞功能展示主页，包含餐食营养估算示意、聊天记录流程、可切换 14/30 天的体重趋势示例。右上角登录和注册进入 `/auth.html` 与 `/auth.html?mode=register`，成功后跳转 `/index.html` 进入原应用。主页展示不请求个人记录、不调用模型；业务接口继续要求登录。
 
 已在桌面与手机尺寸检查无横向溢出，验证营养与趋势切换、注册入口和临时测试账号登录跳转。ECS 首页与静态资源返回 200，匿名 `/api/state` 返回 401，健康接口 200。代码回退包：`/var/backups/fitai/code-before-landing-20260929.tar.gz`。仍通过原 SSH 私人预览访问，没有开放公网端口。
+
+## 首页改版（2026-10-16）
+
+首页改为手机优先的产品展示页（当天先试深色主题，随后恢复原暖白配色）：首屏手机样机展示拍照识别结果，下方为功能卡片、三步流程、可交互的份量示例、体重趋势和隐私说明；手机端滚动后底部固定显示注册按钮。2.2 MB 的 `salmon-pasta-demo.png` 改为方形裁切的 `meal-400/720.webp`（22/55 KB，另有 JPEG 兜底），首页总传输量约 90 KB。`server.py` 新增 webp/jpg 类型，图片返回 `Cache-Control: public, max-age=2592000`，HTML、CSS、JS 与 API 仍为 no-store。
+
+上线前备份：`/var/backups/fitai/landing-20261016-152231/`（旧 landing.html/css/js 与 server.py）。已重启 fitai，首页、CSS、图片、健康接口均 200，匿名 `/api/state` 401。
+
+## 共享模型额度、免登录体验与 PWA（2026-10-16）
+
+- 首页恢复原暖白配色（陶土红 `#bd4c2c`、鼠尾草绿趋势图），保留新布局；页脚及登录页显示 沪ICP备2026053161号。
+- 共享 DeepSeek 额度：未填写个人 Key 的账号，每次 AI 请求（对话、教练、文字/图片/运动估算、模型测试）计 1 次，默认每人每天 30 次（`FITAI_SHARED_DAILY`），全站每天 1500 次（`FITAI_SHARED_GLOBAL_DAILY`）。估算接口此前没有每分钟限流，现已纳入。设置 →「AI 模型」显示今日剩余次数。
+- 免登录拍照体验 `/api/trial/photo`：浏览器端先缩到 1024px JPEG，服务器只接受 2 MB 内的 JPG/PNG/WebP，不保存图片；每个 IP 每天 3 次（`FITAI_TRIAL_IP_DAILY`），全站每天 200 次（`FITAI_TRIAL_DAILY`），与登录用户共用 2 个 AI 并发槽。线上实测一张餐食照片 3.5 秒返回。
+- PWA：`manifest.webmanifest`、`sw.js`（页面网络优先、离线时用最近缓存，`/api/` 不缓存）、`pwa.js`（安卓弹出安装、iOS Safari/微信提示操作步骤，应用内提示 14 天最多一次）及 192/512/maskable/apple-touch 图标。
+- 错误响应改为关闭连接，避免开发服务器在提前拒绝请求后连接错位（生产 waitress 不受影响）。
+
+上线前备份：`/var/backups/fitai/pwa-trial-20261016-155053/`。重启后首页、manifest、sw.js、图标、登录页、健康接口均 200，匿名 `/api/state` 401。
+
+## 首页浅色化（2026-10-16）
+
+首页「三步」区由深色改为浅暖色 `#f7f3ef`，应用内「添加到桌面」提示条也改为浅色。当天试用过一版「盘中下降线」标志，已被下一节的取景框标志取代。备份：`/var/backups/fitai/logo-20261016-155659/`。

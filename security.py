@@ -104,7 +104,12 @@ class Accounts:
     def lock(self, uid):
         return self.locks[int(digest(uid)[:8], 16) % len(self.locks)]
 
-    def limit(self, key, maximum, seconds):
+    def usage(self, key):
+        with self.connect() as c:
+            row = c.execute("SELECT count FROM limits WHERE key=? AND expires>=?", (digest(key), time.time())).fetchone()
+        return row[0] if row else 0
+
+    def limit(self, key, maximum, seconds, message="请求过于频繁，请稍后再试"):
         now = time.time()
         blocked = False
         with self.connect() as c:
@@ -120,7 +125,7 @@ class Accounts:
             else:
                 c.execute("INSERT INTO limits VALUES(?,1,?)", (digest(key), now + seconds))
         if blocked:
-            raise SecurityError("请求过于频繁，请稍后再试", 429)
+            raise SecurityError(message, 429)
 
     def check_origin(self, headers):
         host = headers.get("Host", "").lower()

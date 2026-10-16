@@ -580,7 +580,7 @@ function openSettings(tab = 'profile') {
   if (entering) accountReturnPage = S.page;
   const s=S.state?.settings||{}, p=S.state?.today?.profile||{};
   $('#profileGender').value=p.gender||'male'; $('#profileAge').value=p.age||''; $('#profileHeight').value=p.height||''; $('#profileStart').value=p.start_weight||S.state?.today?.weight||''; $('#profileTarget').value=p.target_weight||''; $('#profileWeekly').value=String(p.weekly_loss ?? .5); $('#profileActivity').value=String(p.activity||1.2);
-  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.key_source==='shared'?'正在使用站点默认 API；填写可改用自己的':s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent='';
+  $('#modelBase').value=s.base_url||''; $('#modelName').value=s.text_model||''; $('#modelKey').value=''; $('#modelKey').placeholder=s.key_source==='shared'?'正在使用站点默认 API；填写可改用自己的':s.has_key?`已保存 ${s.api_key_masked}`:'输入 API Key'; $('#visionEnabled').checked=!!s.vision_enabled; $('#testModelStatus').textContent=''; const q=s.shared_quota; $('#sharedQuota').hidden=!q; if(q) $('#sharedQuota').textContent=`站点默认 API 每天可免费使用 ${q.limit} 次，今天还剩 ${q.remaining} 次（次日自动恢复）。`;
   $('#tavilyKey').value=''; $('#tavilyKey').placeholder=s.tavily_key_source==='shared'?'正在使用站点默认搜索 API':s.has_tavily_key?`已保存 ${s.tavily_api_key_masked}（留空保留）`:'tvly-…'; $('#searchEnabled').checked=!!s.search_enabled; $('#testSearchStatus').textContent='';
   renderAccount(); goPage('account'); selectSettingsTab(tab);
   if (entering) $('#page-account').scrollTop = 0;

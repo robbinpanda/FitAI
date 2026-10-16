@@ -22,3 +22,4 @@
 @media(max-width:900px){.auth-layout{gap:38px}.auth-story h2{font-size:42px}.auth-card{padding:30px}.story-preview{padding:20px}.story-caption{flex-wrap:wrap}}
 @media(max-width:700px){.auth-header{min-height:72px}.auth-layout{display:block;padding-top:26px;padding-bottom:44px;flex:1}.auth-story{display:none}.auth-card{max-width:440px;margin:auto;padding:30px 25px;border-radius:24px}.auth-heading>img{margin-bottom:22px}.auth-heading h1{font-size:30px}.auth-footer{font-size:10px;padding-bottom:calc(22px + env(safe-area-inset-bottom))}.account-button{max-width:100px;padding:6px;font-size:11px}}
 @media(max-width:360px){.auth-card{padding:25px 20px}.auth-footer{gap:8px}}
+.auth-footer .beian{color:inherit}.auth-footer .beian:hover{text-decoration:underline}

@@ -55,6 +55,15 @@ COACH_MAX_IMAGE_BYTES = 12 * 1024 * 1024
 SESSION_TOKEN = uuid.uuid4().hex
 AUTH = None  # Initialized by the local/production entry point, never by an HTTP request.
 AI_SLOTS = threading.BoundedSemaphore(2)
+AI_PATHS = ("/api/agent", "/api/coach", "/api/test_key", "/api/test_vision", "/api/test_search",
+            "/api/analyze_text", "/api/analyze_image", "/api/analyze_exercise")
+# Shared (admin-paid) model budget. Accounts with their own key are not counted.
+SHARED_DAILY = int(os.environ.get("FITAI_SHARED_DAILY", "30"))
+SHARED_GLOBAL_DAILY = int(os.environ.get("FITAI_SHARED_GLOBAL_DAILY", "1500"))
+# Anonymous landing-page photo trial; never stores the image.
+TRIAL_IP_DAILY = int(os.environ.get("FITAI_TRIAL_IP_DAILY", "3"))
+TRIAL_GLOBAL_DAILY = int(os.environ.get("FITAI_TRIAL_DAILY", "200"))
+TRIAL_MAX_IMAGE = 2 * 1024 * 1024
 ACTIVE_JOBS = threading.BoundedSemaphore(2)
 INIT_LOCK = threading.Lock()
 INITIALIZED_USERS = set()
@@ -2115,6 +2124,29 @@ def shared_defaults():
     }
 
 
+def uses_shared_key():
+    return bool(shared_defaults().get("api_key") and not stored_settings().get("api_key"))
+
+
+def _shared_quota_key(uid):
+    return "shared-day:%s:%s" % (uid, date.today().isoformat())
+
+
+def consume_shared_quota(uid):
+    AUTH.limit(_shared_quota_key(uid), SHARED_DAILY, 2 * 86400,
+               "今天的免费 AI 次数（%d 次）已用完，明天自动恢复；也可以在设置里填写自己的 API Key 继续使用" % SHARED_DAILY)
+    AUTH.limit("shared-global:" + date.today().isoformat(), SHARED_GLOBAL_DAILY, 2 * 86400,
+               "今天全站的免费 AI 额度已用完，明天自动恢复；也可以在设置里填写自己的 API Key")
+
+
+def shared_quota():
+    user = security.identity.get()
+    if not user or not AUTH or not uses_shared_key():
+        return None
+    used = AUTH.usage(_shared_quota_key(user["id"]))
+    return {"limit": SHARED_DAILY, "used": used, "remaining": max(0, SHARED_DAILY - used)}
+
+
 def get_settings():
     s = stored_settings()
     shared = shared_defaults()
@@ -2163,6 +2195,7 @@ def public_settings():
         "has_shared_tavily_key": bool(shared.get("tavily_api_key")),
         "tavily_key_source": "own" if own.get("tavily_api_key") else ("shared" if s.get("tavily_api_key") else "none"),
         "search_enabled": bool(s.get("search_enabled")),
+        "shared_quota": shared_quota(),
         "search_ready": bool(s.get("search_enabled") and s.get("tavily_api_key")),
         "privacy": {
             "local_only": "记录保存在本机。",
@@ -3800,12 +3833,61 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("X-FitAI-Auth") != "1":
             raise ApiError("缺少登录请求标识", 403)
         body = self._json_body()
-        # The production listener is loopback-only; nginx overwrites this header.
-        ip = self.headers.get("X-Real-IP", self.client_address[0]) if AUTH.mode == "server" and not AUTH.ssh_preview else self.client_address[0]
-        raw = AUTH.authenticate(body, path.endswith("register"), ip)
+        raw = AUTH.authenticate(body, path.endswith("register"), self._client_ip())
         if user:
             AUTH.revoke(user)
         self._send(200, {"ok": True}, headers={"Set-Cookie": AUTH.cookie(raw)})
+
+    def _client_ip(self):
+        # The production listener is loopback-only; nginx overwrites this header.
+        if AUTH.mode == "server" and not AUTH.ssh_preview:
+            return self.headers.get("X-Real-IP", self.client_address[0])
+        return self.client_address[0]
+
+    def _trial_photo(self, method):
+        if method != "POST":
+            raise ApiError("不支持的请求方法", 405)
+        # Read the body before any rejection so a keep-alive connection stays in sync.
+        image = self._json_body().get("image")
+        if self.headers.get("X-FitAI-Auth") != "1":
+            raise ApiError("缺少请求标识", 403)
+        if (not isinstance(image, str) or len(image) > TRIAL_MAX_IMAGE
+                or not re.fullmatch(r"data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+", image)):
+            raise ApiError("请上传 2 MB 以内的 JPG、PNG 或 WebP 图片", field="image")
+        shared = shared_defaults()
+        if not shared.get("api_key"):
+            raise ApiError("在线体验暂未开放，注册后即可使用", 503)
+        today = date.today().isoformat()
+        AUTH.limit("trial-ip:%s:%s" % (self._client_ip(), today), TRIAL_IP_DAILY, 2 * 86400,
+                   "今天的免费体验次数已用完，注册后可以继续使用")
+        AUTH.limit("trial-global:" + today, TRIAL_GLOBAL_DAILY, 2 * 86400, "今天的在线体验名额已满，明天再来试试")
+        if not AI_SLOTS.acquire(blocking=False):
+            raise ApiError("体验人数较多，请稍后再试", 429)
+        try:
+            out = call_model(
+                shared["base_url"], shared["api_key"], shared["text_model"],
+                [{"role": "system", "content": NUTRITION_SYSTEM},
+                 {"role": "user", "content": [{"type": "image_url", "image_url": {"url": image}},
+                                              {"type": "text", "text": VISION_USER_HINT}]}],
+                timeout=min(60, MODEL_TIMEOUT), json_schema=NUTRITION_SCHEMA, want_reasoning=False)
+        except (RuntimeError, security.SecurityError) as e:
+            raise ApiError("识别服务暂时不可用，请稍后再试", status=502) from e
+        finally:
+            AI_SLOTS.release()
+        data, _ = _parse_nutrition_reply(out)
+        items = _normalize_items((data or {}).get("items"))
+        if not items:
+            raise ApiError("没有识别出食物，请换一张清晰的餐食照片", status=422)
+        items, _ = _ground_items(items)
+        kcal = lambda kj: round(float(kj or 0) / KJ_PER_KCAL)
+        self._send(200, {
+            "ok": True,
+            "items": [{"name": it["name"], "amount": it.get("amount") or "", "kcal": kcal(it.get("kcal")),
+                       "protein": it.get("protein", 0), "carb": it.get("carb", 0), "fat": it.get("fat", 0)}
+                      for it in items[:12]],
+            "total": dict(_sum_items(items), kcal=kcal(_sum_items(items)["kcal"])),
+            "remaining": max(0, TRIAL_IP_DAILY - AUTH.usage("trial-ip:%s:%s" % (self._client_ip(), today))),
+        })
 
     def _dispatch(self, method):
         if AUTH is None:  # Direct legacy test harness; real entry points always enable accounts.
@@ -3818,6 +3900,8 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path.startswith("/api/auth/"):
                 return self._account_api(path, method)
+            if path == "/api/trial/photo":
+                return self._trial_photo(method)
             if path.startswith("/api/") and path != "/api/health":
                 user = AUTH.session(self.headers)
                 if not user:
@@ -3831,8 +3915,10 @@ class Handler(BaseHTTPRequestHandler):
                     locked = None
                     raise ApiError("当前账号有请求正在处理，请稍后重试", 429)
                 prepare_user(user)
-                if method == "POST" and path in ("/api/agent", "/api/coach", "/api/test_key", "/api/test_vision", "/api/test_search"):
+                if method == "POST" and path in AI_PATHS:
                     AUTH.limit("ai:" + user["id"], 12, 60)
+                    if uses_shared_key():
+                        consume_shared_quota(user["id"])
                     ai_acquired = AI_SLOTS.acquire(blocking=False)
                     if not ai_acquired:
                         raise ApiError("AI 服务繁忙，请稍后再试", 429)
@@ -3845,6 +3931,8 @@ class Handler(BaseHTTPRequestHandler):
                         raise ApiError("服务器磁盘空间不足，请联系管理员", 507)
             return self._do_GET() if method == "GET" else self._do_POST()
         except Exception as e:
+            # An early rejection may leave the request body unread; don't reuse the connection.
+            self.close_connection = True
             self._send_err(e)
         finally:
             if ai_acquired:
@@ -3891,7 +3979,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        if "Cache-Control" not in (headers or {}):
+            self.send_header("Cache-Control", "no-store")
+        if getattr(self, "close_connection", False) and getattr(self, "request_version", "") == "HTTP/1.1":
+            self.send_header("Connection", "close")
         if AUTH is None and code == 200 and obj is not None and isinstance(obj, dict) and "session_token" in obj:
             self.send_header(
                 "Set-Cookie",
@@ -3933,6 +4024,8 @@ class Handler(BaseHTTPRequestHandler):
         limit = 100 * 1024 * 1024 if path == "/api/import" else (24 * 1024 * 1024 if path in ("/api/coach", "/api/agent") else 12 * 1024 * 1024)
         if path.startswith("/api/auth/"):
             limit = 4096
+        elif path == "/api/trial/photo":
+            limit = TRIAL_MAX_IMAGE + 1024
         elif AUTH and AUTH.mode == "server":
             limit = 8 * 1024 * 1024
         if n > limit:
@@ -4015,9 +4108,12 @@ class Handler(BaseHTTPRequestHandler):
         ext = os.path.splitext(fpath)[1].lower()
         ctype = {".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8",
                  ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
-                 ".ico": "image/x-icon"}.get(ext, "application/octet-stream")
+                 ".webp": "image/webp", ".jpg": "image/jpeg", ".ico": "image/x-icon",
+                 ".webmanifest": "application/manifest+json"}.get(ext, "application/octet-stream")
+        # Images never change in place (new name per revision); let browsers cache them.
+        cache = {"Cache-Control": "public, max-age=2592000"} if ext in (".webp", ".jpg", ".png", ".svg") else None
         with open(fpath, "rb") as f:
-            self._send(200, raw=f.read(), ctype=ctype)
+            self._send(200, raw=f.read(), ctype=ctype, headers=cache)
 
     def _api_get(self, p, u):
         qs = parse_qs(u.query)

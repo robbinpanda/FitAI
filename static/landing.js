@@ -39,3 +39,71 @@ demoConfirm.addEventListener('click', () => {
   document.getElementById('foodDemoStatus').textContent = '演示完成。登录后即可保存自己的餐食记录。';
   demoConfirm.textContent = '已确认 ✓'; demoConfirm.disabled = true;
 });
+
+// Mobile: show the sticky sign-up bar once the hero call-to-action scrolls away.
+const mobileCta = document.querySelector('.mobile-cta');
+const heroActions = document.querySelector('.hero-actions');
+if (mobileCta && heroActions && 'IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => mobileCta.classList.toggle('show', !entry.isIntersecting && entry.boundingClientRect.top < 0)).observe(heroActions);
+}
+
+// Anonymous photo trial: image is downscaled in the browser, sent once, never stored.
+const trialFile = document.getElementById('trialFile');
+const trialStatus = document.getElementById('trialStatus');
+function shrinkImage(file, max = 1024) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale); canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('无法读取这张图片，请换一张 JPG 或 PNG')); };
+    img.src = url;
+  });
+}
+function cell(tag, text, extra) {
+  const el = document.createElement(tag); el.textContent = text;
+  if (extra) { const small = document.createElement('small'); small.textContent = extra; el.append(small); }
+  return el;
+}
+function setTrialStatus(text, error) { trialStatus.textContent = text; trialStatus.classList.toggle('error', !!error); }
+trialFile?.addEventListener('change', async () => {
+  const file = trialFile.files[0];
+  trialFile.value = '';
+  if (!file) return;
+  trialFile.disabled = true;
+  setTrialStatus('AI 正在识别这一餐，通常需要几秒…');
+  try {
+    const image = await shrinkImage(file);
+    const response = await fetch('/api/trial/photo', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-FitAI-Auth': '1'}, body: JSON.stringify({image})});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || '识别失败，请稍后再试');
+    document.getElementById('trialImage').src = image;
+    document.getElementById('trialPreview').hidden = false;
+    const rows = document.getElementById('foodRows');
+    rows.replaceChildren(...data.items.map(item => {
+      const tr = document.createElement('tr');
+      tr.append(cell('th', item.name), cell('td', item.amount), cell('td', item.kcal + ' kcal'));
+      tr.firstChild.scope = 'row';
+      return tr;
+    }));
+    const t = data.total;
+    document.getElementById('foodTotal').textContent = t.kcal + ' kcal';
+    document.getElementById('foodMacros').textContent = `蛋白质 ${t.protein} g · 碳水 ${t.carb} g · 脂肪 ${t.fat} g`;
+    document.getElementById('foodBadge').textContent = 'AI 估算 · 仅供参考';
+    document.getElementById('foodDemoStatus').textContent = '注册后可以调整份量并保存到每日记录。';
+    demoConfirm.textContent = '注册保存'; demoConfirm.disabled = false;
+    demoConfirm.onclick = () => { location.href = document.querySelector('[data-start]').href; };
+    setTrialStatus(`识别完成。今天还可以再试 ${data.remaining} 次。`);
+    document.querySelector('.food-output').scrollIntoView({behavior: 'smooth', block: 'start'});
+  } catch (error) {
+    setTrialStatus(error.message, true);
+  } finally {
+    trialFile.disabled = false;
+  }
+});
