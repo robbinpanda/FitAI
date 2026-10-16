@@ -3,7 +3,7 @@
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const TODAY = new Date().toLocaleDateString('sv-SE');
-const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null, recordingIntent: '' };
+const S = { date: TODAY, page: 'chat', token: '', state: null, history: [], sessions: [], sessionId: null, messages: [], images: [], range: 14, busy: false, currentTool: null, currentRecord: null };
 const pageMeta = { chat: ['私人减脂助手', '和拍拍记聊聊'], today: ['每日快照', '今日概要'], trend: ['长期变化', '趋势'], account: ['MY SPACE', '个人中心'] };
 let accountReturnPage = 'chat';
 const undoRecords = [];
@@ -89,7 +89,7 @@ function toast(text) { const el = $('#toast'); el.textContent = text; el.hidden 
 function setBusy(on) {
   S.busy = on;
   $('#sendBtn').disabled = on; $('#stopBtn').hidden = !on; $('#sendBtn').hidden = on;
-  $('#searchToggle').disabled = on; $('#cancelRecordingIntent').disabled = on; $('#typing').hidden = !on;
+  $('#searchToggle').disabled = on; $('#typing').hidden = !on;
   $('#chatInput').disabled = on; $('#imageBtn').disabled = on;
   $('#messages').setAttribute('aria-busy', String(on));
   if (on) { $('#typing em').textContent = '正在理解你的输入…'; followChat = true; scrollChat(); }
@@ -148,6 +148,7 @@ function goPage(page) {
   $('#accountBtn').setAttribute('aria-current', page === 'account' ? 'page' : 'false');
   $('.date-control').hidden = page === 'account';
   $('#unitBtn').hidden = page === 'account';
+  if (page === 'chat') resizeInput();
   if (page === 'today') renderToday();
   if (page === 'trend') renderTrend();
 }
@@ -329,7 +330,7 @@ async function loadSessions(selectLatest = false) {
   renderSessions(); await loadMessages();
 }
 function renderSessions() { $('#sessionList').innerHTML = S.sessions.slice(0,8).map(s => `<button class="${s.id === S.sessionId ? 'active' : ''}" data-session="${esc(s.id)}" title="${esc(s.title)}">${esc(s.title || '新对话')}</button>`).join(''); }
-async function createSession() { if(S.busy){toast('请先停止生成，再新建对话');return;} selectRecordingIntent(''); try { const data = await api.post('/api/coach/session/create', { date: S.date, title: '新对话' }); S.sessionId = data.session.id; await loadSessions(); goPage('chat'); $('#chatInput').focus(); } catch (e) { toast(e.message); } }
+async function createSession() { if(S.busy){toast('请先停止生成，再新建对话');return;} try { const data = await api.post('/api/coach/session/create', { date: S.date, title: '新对话' }); S.sessionId = data.session.id; await loadSessions(); goPage('chat'); $('#chatInput').focus(); } catch (e) { toast(e.message); } }
 async function loadMessages() { if (!S.sessionId) return; try { const data = await api.get(`/api/coach/session?id=${encodeURIComponent(S.sessionId)}`); S.messages = data.messages || []; renderMessages(); } catch (e) { toast(e.message); } }
 
 function richText(text) { return esc(text).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|\n)[-•]\s+/g,'$1<span class="bullet">• </span>').replace(/\n/g,'<br>'); }
@@ -380,7 +381,6 @@ function scrollChat() { requestAnimationFrame(() => { const el = $('#messageScro
 async function sendAgent() {
   if (S.busy) return; const input = $('#chatInput'); const question = input.value.trim(); if (!question && !S.images.length) return;
   if (!S.state?.settings?.has_key) { openSettings('model'); toast('先配置一个 AI 模型即可开始对话'); return; }
-  const recordingIntent = S.recordingIntent;
   if (!S.sessionId) await createSession();
   const optimistic = { role:'user', content:question || '请看这些图片', image_urls:S.images.map(x => x.url), created_at:TODAY+'T'+new Date().toLocaleTimeString('sv-SE') };
   const draft = {role:'assistant',content:'',streaming:true};
@@ -389,18 +389,17 @@ async function sendAgent() {
   $('#chatError').hidden = true;
   streamController = new AbortController();
   try {
-    const result = await streamAgent({ session_id:S.sessionId, date:S.date, question, images, recording_intent:recordingIntent }, (kind,data) => {
+    const result = await streamAgent({ session_id:S.sessionId, date:S.date, question, images }, (kind,data) => {
       if (kind === 'reply') { draft.content = data.text || ''; scheduleChatPaint(); }
       if (kind === 'status') $('#typing em').textContent = data.text;
     }, streamController.signal);
     Object.assign(draft, {streaming:false, content:result?.reply || '', id:result?.message_id,
       tool_calls:result?.tool_calls || [], search_data:result?.search_data});
     renderMessages();
-    selectRecordingIntent('');
     await Promise.all([loadMessages(), loadState(), loadSessionsOnly().catch(()=>toast('回复已保存，对话列表刷新失败，请稍后刷新'))]);
   } catch (e) {
     S.messages = S.messages.filter(x => x !== optimistic && x !== draft);
-    input.value = question; selectRecordingIntent(recordingIntent); S.images = images.map(data => ({ data, url:data, name:'待重试图片' }));
+    input.value = question; S.images = images.map(data => ({ data, url:data, name:'待重试图片' }));
     resizeInput(); renderImages(); renderMessages();
     $('#chatErrorText').textContent = e.name === 'AbortError' ? '已停止等待，输入已恢复。' : `${e.message}。输入已保留，可重试。`;
     $('#chatError').hidden = false;
@@ -547,17 +546,9 @@ async function decideTool(decision, direct = null) {
   catch(e) { toast(e.message); } finally { btn.disabled = false; }
 }
 
-function selectRecordingIntent(intent) {
-  S.recordingIntent = ['meal','exercise','weight'].includes(intent) ? intent : '';
-  const hints = {meal:'饮食记录：告诉我吃了什么和大致份量，也可以上传照片',exercise:'运动记录：告诉我做了什么、多久和大致强度',weight:'体重记录：输入本次称重数值'};
-  $('#recordingIntent').hidden = !S.recordingIntent;
-  $('#recordingIntentText').textContent = hints[S.recordingIntent] || '';
-  $('#chatInput').placeholder = hints[S.recordingIntent] || '今天想记录什么？';
-}
 function handleChatShortcut(button) {
   if (S.busy) { toast('请等当前回复完成后再切换'); return; }
   goPage('chat');
-  selectRecordingIntent(button.dataset.recordIntent || '');
   const input = $('#chatInput');
   // Opening an entry never sends a message or replaces an unfinished draft.
   if (button.dataset.prompt && !input.value.trim() && !S.images.length) input.value = button.dataset.prompt;
@@ -590,6 +581,7 @@ function selectSettingsTab(tab) {
   const descriptions = {
     profile: ['个人信息', '完善基本资料，让建议更适合你。'],
     plan: ['减肥计划', '设定目标与节奏，按自己的步调来。'],
+    appearance: ['字体大小', '选择看起来舒服的大小，下面可直接预览。'],
     model: ['AI 服务', '查看当前连接，也可以使用自己的模型。'],
     search: ['联网搜索', '按需查找资料，来源清楚可见。'],
     data: ['数据与隐私', '管理属于你的记录与备份。'],
@@ -599,8 +591,19 @@ function selectSettingsTab(tab) {
   $$('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab));
   $('#settingsTitle').textContent=descriptions[tab][0];
   $('#settingsDescription').textContent=descriptions[tab][1];
-  $('#accountSavebar').hidden=['data','security'].includes(tab);
+  $('#accountSavebar').hidden=['appearance','data','security'].includes(tab);
   $('#accountFeedback').textContent='';
+  if (tab === 'appearance') syncFontSizeControls();
+}
+function syncFontSizeControls() {
+  const value = window.AppAppearance.get();
+  $$('[data-font-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.fontChoice === value)));
+}
+function setFontSize(value) {
+  const saved = window.AppAppearance.set(value);
+  syncFontSizeControls();
+  $('#fontSizeStatus').textContent = saved ? '已应用并保存到本设备。' : '已应用；当前浏览器无法保存设置，重新打开后可能恢复默认。';
+  if (S.page === 'chat') { resizeInput(); if (followChat) scrollChat(); }
 }
 async function saveSettings() {
   const tab=$('.settings-tabs button.active')?.dataset.tab;
@@ -639,6 +642,8 @@ async function exportData(){try{const data=await api.get('/api/export');const bl
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
+  syncFontSizeControls();
+  $$('[data-font-choice]').forEach(button => button.addEventListener('click', () => setFontSize(button.dataset.fontChoice)));
   bindModalViewport();
   bindChart($('#weightChart')); bindChart($('#intakeChart'));
   bindChartResize();
@@ -668,11 +673,10 @@ function bind() {
   $('#logoutEntry').onclick=()=>openMask('accountMask');
   $('#prevDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()-1);setDate(isoDate(d))}; $('#nextDate').onclick=()=>{const d=dayObj();d.setDate(d.getDate()+1);setDate(isoDate(d))}; $('#dateButton').onclick=()=>{const el=$('#dateInput'); if(el.showPicker)el.showPicker();else el.click()}; $('#dateInput').onchange=e=>setDate(e.target.value);
   $('#unitBtn').onclick=async()=>{const next=unit()==='kcal'?'kJ':'kcal';try{await api.post('/api/prefs',{display_unit:next});S.state.display_unit=next;$('#unitLabel').textContent=next;renderToday();renderTrend()}catch(e){toast(e.message)}};
-  $('#cancelRecordingIntent').onclick=()=>selectRecordingIntent('');
   $('#sendBtn').onclick=()=>sendAgent(); $('#chatInput').addEventListener('input',resizeInput); $('#chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();sendAgent()}});
   $('#imageBtn').onclick=()=>$('#imageInput').click(); $('#imageInput').onchange=e=>{addImages(e.target.files);e.target.value=''}; $('#composer').addEventListener('dragover',e=>{e.preventDefault()}); $('#composer').addEventListener('drop',e=>{e.preventDefault();addImages(e.dataTransfer.files)});
   document.addEventListener('paste',e=>{if(S.page==='chat'&&e.clipboardData?.files?.length)addImages(e.clipboardData.files)});
-  document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt],[data-record-intent],[data-chat-entry]');if(p)handleChatShortcut(p); const s=e.target.closest('[data-session]');if(s){if(S.busy){toast('请先停止生成，再切换对话');return;}followChat=true;selectRecordingIntent('');S.sessionId=s.dataset.session;renderSessions();loadMessages();goPage('chat')} const rem=e.target.closest('[data-remove-image]');if(rem){S.images.splice(Number(rem.dataset.removeImage),1);renderImages()} const open=e.target.closest('[data-tool-open]');if(open)openTool(open.dataset.message,open.dataset.toolOpen);const rej=e.target.closest('[data-tool-reject]');if(rej){const m=S.messages.find(x=>x.id===Number(rej.dataset.message));const c=m?.tool_calls?.find(x=>x.id===rej.dataset.toolReject);if(c)decideTool('reject',{messageId:Number(rej.dataset.message),call:c})} const close=e.target.closest('[data-close]');if(close)closeMask(close.dataset.close)});
+  document.addEventListener('click',e=>{const p=e.target.closest('[data-prompt],[data-chat-entry]');if(p)handleChatShortcut(p); const s=e.target.closest('[data-session]');if(s){if(S.busy){toast('请先停止生成，再切换对话');return;}followChat=true;S.sessionId=s.dataset.session;renderSessions();loadMessages();goPage('chat')} const rem=e.target.closest('[data-remove-image]');if(rem){S.images.splice(Number(rem.dataset.removeImage),1);renderImages()} const open=e.target.closest('[data-tool-open]');if(open)openTool(open.dataset.message,open.dataset.toolOpen);const rej=e.target.closest('[data-tool-reject]');if(rej){const m=S.messages.find(x=>x.id===Number(rej.dataset.message));const c=m?.tool_calls?.find(x=>x.id===rej.dataset.toolReject);if(c)decideTool('reject',{messageId:Number(rej.dataset.message),call:c})} const close=e.target.closest('[data-close]');if(close)closeMask(close.dataset.close)});
   $('#confirmToolBtn').onclick=()=>decideTool('confirm'); $('#rejectToolBtn').onclick=()=>decideTool('reject');
   $$('.modal-mask').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)closeMask(m.id)})); document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal-mask:not([hidden])').forEach(m=>closeMask(m.id));if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!e.ctrlKey&&!e.metaKey&&['1','2','3'].includes(e.key))goPage(['chat','today','trend'][Number(e.key)-1])});
   $$('.settings-tabs button').forEach(x=>x.onclick=()=>{selectSettingsTab(x.dataset.tab);if(matchMedia('(max-width:700px)').matches){document.querySelector('#settingsTitle').scrollIntoView({block:'start'});document.querySelector('#settingsTitle').focus({preventScroll:true})}}); $('#saveSettingsBtn').onclick=saveSettings; $('#testModelBtn').onclick=testModel; $('#clearModelKeyBtn').onclick=()=>clearOwnKey('model'); $('#exportBtn').onclick=exportData; $('#importInput').onchange=e=>{importData(e.target.files[0]);e.target.value=''};

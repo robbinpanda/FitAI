@@ -45,7 +45,7 @@ test('mobile shell keeps readable controls clear of safe areas and scrollable co
             hiddenSidebar:css('.sidebar').visibility==='hidden',blur:css('.mobile-nav').backdropFilter,
             overflow:document.documentElement.scrollWidth>innerWidth,
             hits:['#menuBtn','#topNewChatBtn','#dateButton','#unitBtn','#chatInput','#sendBtn','.mobile-nav button'].every(hit),
-            touchTargets:[...document.querySelectorAll('.composer-shortcuts button,.mobile-nav button')].every(el=>el.getBoundingClientRect().height>=44)};
+            touchTargets:[...document.querySelectorAll('.mobile-nav button')].every(el=>el.getBoundingClientRect().height>=44)};
         });
         assert.equal(layout.header.top,0,JSON.stringify(layout));
         assert.equal(layout.header.width,width,JSON.stringify(layout));

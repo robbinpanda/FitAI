@@ -1,0 +1,35 @@
+/* Text sizes change independently of fixed iOS-safe toolbars and page geometry. */
+:root{--reading-text:15px;--detail-text:13px;--ui-text:14px;--small-text:11px;--input-text:16px;--nav-text:13px}
+:root[data-font-size="large"]{--reading-text:18px;--detail-text:16px;--ui-text:16px;--small-text:13px;--input-text:18px;--nav-text:14px}
+:root[data-font-size="xlarge"]{--reading-text:21px;--detail-text:18px;--ui-text:18px;--small-text:14px;--input-text:20px;--nav-text:15px}
+.font-size-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0}
+.font-size-options button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:94px;padding:12px 6px;border:2px solid var(--line);border-radius:15px;background:var(--paper)}
+.font-size-options button[aria-pressed="true"]{border-color:var(--accent-dark);background:var(--accent-soft);color:var(--accent-dark)}
+.font-size-options button>span{font-size:20px;line-height:1.3}.font-size-options button:nth-child(2)>span{font-size:25px}.font-size-options button:nth-child(3)>span{font-size:30px}
+.font-size-options b{font-size:var(--ui-text);font-weight:600}
+.font-preview{padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--bg);overflow-wrap:anywhere}
+.font-preview-label{font-size:var(--small-text);color:var(--muted)}
+.font-preview-text{font-size:var(--reading-text);line-height:1.8;margin:12px 0;font-weight:600}
+.font-preview-detail{font-size:var(--detail-text);line-height:1.8;margin:0}
+html[data-font-size]:not([data-font-size="standard"]) :is(.message-text,.welcome>p){font-size:var(--reading-text)}
+html[data-font-size]:not([data-font-size="standard"]) :is(.tool-line,.tool-card-head b,.panel-head>span:first-child,.log-item b,.macro-row>span,.macro-row b,.mini-card>span,.mini-card small,.section-intro p,.energy-card>p,.account-panel-lead,.account-note,.account-feedback,.notice span,.search-help,.privacy-list small,.account-security p,.modal-lead,.estimate-note,.editor-note,.editor-field span,.nutrient-grid label span,.form-grid label>span,.management-row){font-size:var(--detail-text)}
+html[data-font-size]:not([data-font-size="standard"]) :is(.tool-card-head small,.tool-state,.message-time,.log-item small,.panel-head small,.energy-labels,.trend-kpi span,.trend-kpi small,.composer-meta,.search-toggle,.search-caption,.search-warning,.account-heading p,.account-identity>span,.account-identity p,.account-goals span,.settings-tabs button span){font-size:var(--small-text)}
+html[data-font-size]:not([data-font-size="standard"]) :is(.settings-tabs button,.tool-card-actions button,.soft-button,.ghost-button,.primary-button,.danger-button,.text-button,.record-edit,.account-panel .inline-actions button,.account-panel .inline-actions a,.account-panel .inline-actions>span,.account-savebar button,.notice b,.privacy-list b,.search-sources a,.account-back){font-size:var(--ui-text)}
+html[data-font-size]:not([data-font-size="standard"]) :is(.composer textarea,.editor-field input,.editor-field select,.nutrient-grid input,.form-grid input,.form-grid select){font-size:var(--input-text)}
+html[data-font-size]:not([data-font-size="standard"]) .mobile-nav button span{font-size:var(--nav-text)}
+html[data-font-size]:not([data-font-size="standard"]) .tool-card-head{flex-wrap:wrap}
+html[data-font-size]:not([data-font-size="standard"]) .tool-card-head>div{min-width:0}
+html[data-font-size]:not([data-font-size="standard"]) .tool-line{gap:10px;flex-wrap:wrap;overflow-wrap:anywhere}
+html[data-font-size]:not([data-font-size="standard"]) .tool-card-actions{flex-wrap:wrap}
+html[data-font-size]:not([data-font-size="standard"]) .tool-card-actions button{height:auto;min-height:44px;padding-block:8px}
+html[data-font-size]:not([data-font-size="standard"]) .account-savebar{flex-wrap:wrap}
+html[data-font-size]:not([data-font-size="standard"]) .account-heading{flex-wrap:wrap}
+html[data-font-size]:not([data-font-size="standard"]) .account-savebar button{white-space:normal;padding-block:8px}
+html[data-font-size]:not([data-font-size="standard"]) .composer-meta{flex-wrap:wrap}
+@media(max-width:480px){
+  .font-size-options{gap:6px}.font-preview{padding:16px}
+  html[data-font-size]:not([data-font-size="standard"]) .macro-row{grid-template-columns:60px minmax(0,1fr) 110px;gap:6px}
+  html[data-font-size]:not([data-font-size="standard"]) .log-item{grid-template-columns:30px minmax(0,1fr) auto}
+  html[data-font-size]:not([data-font-size="standard"]) .log-item>strong{grid-column:2}
+  html[data-font-size]:not([data-font-size="standard"]) .record-edit{grid-column:3;grid-row:1/3}
+}
