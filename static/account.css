@@ -19,3 +19,50 @@
 @media(prefers-reduced-motion:reduce){.welcome{animation:none}}
 @media(max-width:390px){.welcome h2{font-size:26px;line-height:1.4}}
 @media(max-width:1100px){.menu-backdrop{left:270px}}
+
+/* Keep phone controls clear and above the iOS status / home-indicator areas.
+   Reserve the navigation space once, in the shell, rather than in the composer. */
+@media(max-width:1100px){
+  :root{
+    --app-safe-top:env(safe-area-inset-top,0px);
+    --app-safe-bottom:env(safe-area-inset-bottom,0px);
+    --phone-nav-height:74px;
+    --phone-nav-bottom:max(16px,calc(var(--app-safe-bottom) + 8px));
+    --phone-nav-space:calc(var(--phone-nav-height) + var(--phone-nav-bottom) + 8px);
+    --topbar:64px;
+  }
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body{overscroll-behavior:none}
+  .ambient{display:none}
+  .app-shell{padding-top:var(--app-safe-top);background:var(--bg)}
+  .main{padding-bottom:var(--phone-nav-space)}
+  .page{height:auto;flex:1;min-height:0}
+  .topbar{height:var(--topbar);background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .sidebar{visibility:hidden;backdrop-filter:none;-webkit-backdrop-filter:none;padding-top:max(28px,var(--app-safe-top));padding-bottom:max(20px,var(--app-safe-bottom))}
+  .sidebar.open{visibility:visible}
+  .date-control,.unit-button,.icon-button,.personal-button{background:var(--paper);color:var(--ink)}
+  .date-control span{font-size:14px}.date-control small{font-size:11px;color:#665f58}
+  .unit-button span,.personal-button{font-size:14px}
+  .menu-button svg{width:22px;height:22px}
+  .composer-wrap{padding:8px 12px 8px;background:var(--bg)}
+  .composer-shortcuts{gap:8px;margin-bottom:8px}
+  .composer-shortcuts button{flex:1;min-height:44px;font-size:14px;font-weight:600;border-radius:12px;padding:8px}
+  .composer{min-height:62px;gap:6px;padding:8px;border-radius:18px;box-shadow:0 4px 18px #4933210a}
+  .composer textarea{min-height:44px;padding:9px 4px}
+  .composer-tool,.send-button,.stop-button{width:44px;height:44px}
+  .composer-tool svg,.send-button svg{width:22px;height:22px}
+  .composer-meta{margin-top:4px;min-height:36px;gap:8px;font-size:11px;color:#665f58}
+  .search-toggle{min-height:36px;font-size:12px;color:#665f58}
+  .search-toggle input{width:18px;height:18px;margin:0 3px 0 0}
+  .mobile-nav{
+    left:12px;right:12px;bottom:var(--phone-nav-bottom);height:var(--phone-nav-height);
+    padding:6px;gap:4px;border:1px solid var(--line-strong);border-radius:22px;
+    background:var(--paper);backdrop-filter:none;-webkit-backdrop-filter:none;
+    box-shadow:0 6px 24px #4933210c;
+  }
+  .mobile-nav button{min-height:58px;gap:4px;border-radius:16px;color:#665f58}
+  .mobile-nav svg{width:26px;height:26px;stroke-width:1.9}
+  .mobile-nav button span{font-size:13px;line-height:1.4;font-weight:600}
+  .mobile-nav button.active{background:var(--accent-soft);color:var(--accent-dark)}
+  .content-width,.account-content{padding-bottom:24px}
+}
