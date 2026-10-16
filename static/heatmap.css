@@ -5,7 +5,9 @@
 .heatmap-month-nav strong{font-size:var(--ui-text);min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
 .heatmap-month-nav button{width:44px;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--paper);font-size:26px;line-height:1}
 .heatmap-month-nav button:disabled{opacity:.3;cursor:default}
-#monthHeatmap{max-width:440px;margin:24px auto 18px;min-height:230px}
+#monthHeatmap{max-width:440px;margin:24px auto 18px;min-height:230px;touch-action:pan-y pinch-zoom}
+.heatmap-swipe-hint{display:none}
+@media(pointer:coarse){.heatmap-swipe-hint{display:block;margin:10px 0 0;font-size:var(--small-text);color:var(--muted);text-align:center}}
 .heatmap-weekdays,.heatmap-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .heatmap-weekdays{font-size:var(--small-text);color:var(--muted);text-align:center;margin-bottom:10px}
 .heatmap-day{width:100%;aspect-ratio:1;border-radius:6px;font-size:var(--small-text);font-weight:650;font-variant-numeric:tabular-nums;border:1px solid rgba(35,74,46,.08);position:relative}

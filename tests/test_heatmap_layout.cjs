@@ -42,6 +42,34 @@ test('monthly heatmap counts records, changes months, handles races and fits pho
     await page.locator('[data-heatmap-date="2024-02-04"]').click();
     assert.match(await page.locator('#heatmapDetail').textContent(),/饮食 3 条 \/ 运动 1 条 \/ 体重 1 条/);
     assert.equal(await page.locator('[data-heatmap-date="2024-02-04"]').getAttribute('aria-pressed'),'true');
+    const touchSession=await page.context().newCDPSession(page);
+    async function swipe(dx,dy=0,{cancel=false,multi=false}={}){
+      await page.locator('#monthHeatmap').scrollIntoViewIfNeeded();
+      const box=await page.locator('#monthHeatmap').boundingBox();
+      const x=box.x+box.width/2-dx/2,y=Math.max(110,Math.min(600,box.y+100));
+      const points=(mx,my)=>[{x:mx,y:my,id:1},...(multi?[{x:mx+25,y:my+25,id:2}]:[])];
+      await touchSession.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:points(x,y)});
+      for(let i=1;i<=6;i++)await touchSession.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:points(x+dx*i/6,y+dy*i/6)});
+      await touchSession.send('Input.dispatchTouchEvent',{type:cancel?'touchCancel':'touchEnd',touchPoints:[]});
+    }
+    await swipe(110);
+    await page.waitForFunction(()=>H.loaded==='2024-01');
+    assert.equal(await page.evaluate(()=>H.selected),null,'swipe must not select a day');
+    await swipe(-110);
+    await page.waitForFunction(()=>H.loaded==='2024-02');
+    assert.equal(await page.evaluate(()=>H.selected),null);
+    await swipe(22); // Movement below the month-switch threshold.
+    assert.equal(await page.evaluate(()=>H.month),'2024-02');
+    const beforeScroll=await page.locator('#page-trend').evaluate(el=>el.scrollTop);
+    await swipe(10,100);
+    await page.waitForFunction(before=>document.querySelector('#page-trend').scrollTop<before,beforeScroll);
+    assert.equal(await page.evaluate(()=>H.month),'2024-02','vertical page scroll must not change month');
+    await swipe(110,0,{cancel:true});
+    assert.equal(await page.evaluate(()=>H.month),'2024-02');
+    await swipe(100,0,{multi:true});
+    assert.equal(await page.evaluate(()=>H.month),'2024-02','two-finger gesture must not change month');
+    await page.locator('[data-heatmap-date="2024-02-04"]').tap();
+    assert.equal(await page.evaluate(()=>H.selected),'2024-02-04','a new tap still selects a day');
     const summary=await page.locator('#heatmapSummary').textContent();assert.match(summary,/本月已记录 \d+ 天 · 共 \d+ 条/);
     await page.locator('#rangeSwitch [data-range="7"]').click();
     assert.equal(await page.locator('#heatmapSummary').textContent(),summary);
@@ -92,6 +120,8 @@ test('monthly heatmap counts records, changes months, handles races and fits pho
     await page.waitForFunction(()=>H.loaded===TODAY.slice(0,7));
     await page.evaluate(()=>changeHeatmapMonth(1));
     assert.equal(await page.evaluate(()=>H.month),current);
+    await swipe(-110);
+    assert.equal(await page.evaluate(()=>H.month),current,'swiping cannot open a future month');
     assert.deepEqual(errors,[]);
   }finally{await browser.close()}
 });

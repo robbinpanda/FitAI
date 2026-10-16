@@ -326,6 +326,40 @@ function changeHeatmapMonth(step) {
   H.month = next; H.selected = null;
   loadHeatmap();
 }
+function bindHeatmapSwipe() {
+  const surface = $('#monthHeatmap');
+  let gesture = null, suppressClickUntil = 0;
+  surface.addEventListener('touchstart', event => {
+    suppressClickUntil = 0;
+    if (event.touches.length !== 1) { gesture = null; return; }
+    const touch = event.touches[0];
+    gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, axis: null };
+  }, { passive: true });
+  surface.addEventListener('touchmove', event => {
+    if (!gesture) return;
+    if (event.touches.length !== 1) { gesture = null; return; }
+    const touch = [...event.touches].find(item => item.identifier === gesture.id);
+    if (!touch) { gesture = null; return; }
+    const dx = Math.abs(touch.clientX - gesture.x), dy = Math.abs(touch.clientY - gesture.y);
+    if (!gesture.axis && Math.max(dx, dy) >= 12) gesture.axis = dx > dy * 1.3 ? 'x' : 'y';
+    if (gesture.axis === 'x' && event.cancelable) event.preventDefault();
+  }, { passive: false });
+  surface.addEventListener('touchend', event => {
+    const start = gesture;
+    gesture = null;
+    if (!start || event.touches.length || start.axis !== 'x') return;
+    const touch = [...event.changedTouches].find(item => item.identifier === start.id);
+    if (!touch) return;
+    const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+    // A drag must not also select a day (including at the current-month boundary).
+    suppressClickUntil = Date.now() + 450;
+    if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.3) changeHeatmapMonth(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  surface.addEventListener('touchcancel', () => { gesture = null; }, { passive: true });
+  surface.addEventListener('click', event => {
+    if (event.detail && Date.now() < suppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }, true);
+}
 async function loadHeatmap(force = false) {
   if (!force && (H.loaded === H.month || H.pending === H.month)) return;
   const month = H.month, sequence = ++H.sequence, info = heatmapMonthInfo(month);
@@ -702,6 +736,7 @@ async function exportData(){try{const data=await api.get('/api/export');const bl
 async function importData(file){if(!file)return;try{const data=JSON.parse(await file.text());await api.post('/api/import',data);await Promise.all([loadState(),loadSessions(true)]);toast('备份已恢复')}catch(e){toast(e.message)}}
 
 function bind() {
+  bindHeatmapSwipe();
   $('#heatmapPrev').onclick = () => changeHeatmapMonth(-1);
   $('#heatmapNext').onclick = () => changeHeatmapMonth(1);
   $('#monthHeatmap').onclick = event => {
